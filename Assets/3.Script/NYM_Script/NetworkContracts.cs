@@ -105,7 +105,7 @@ public struct AccountResultMessage : NetworkMessage
 // 본인 전적. gamesPlayed == 0이면 averageRank는 무시하고 화면에 "—" 표시.
 public struct PlayerProfile
 {
-    public long userId;
+    public string userId; // 계정 키 = 소문자로 정규화한 로그인 아이디 (DB user_id PK, 통합작업명세 v2.1)
     public string nickname;
     public int wins;
     public int losses;
