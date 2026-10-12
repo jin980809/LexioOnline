@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a010a47d731a7fc49818557176d81523, type: 3}
+  m_Name: TileDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::TileDatabase
+  cloudPrefabs:
+  - {fileID: 7430326025601655677, guid: 9ccedc7e0a41ea044ac6e672d8a4bfe5, type: 3}
+  - {fileID: 8568048012121671645, guid: d5f4c82ae1a72ed4780fe231bb5746d6, type: 3}
+  - {fileID: 7820589766892053894, guid: ecc10a4e39c7b6e4c87c2ffdfd7d174b, type: 3}
+  - {fileID: 3821375066765465736, guid: 57996d7105168a441bdd096f56e1f570, type: 3}
+  - {fileID: 2982044742146022367, guid: 032d0fd8171fe0d479acb26620471af2, type: 3}
+  - {fileID: 6371028932154080590, guid: c4eb283dbc6b4aa4993ba1c39d3aa3c4, type: 3}
+  - {fileID: 7370605200591839970, guid: 1943caa3cd81e1c46adc9f5e375ee045, type: 3}
+  - {fileID: 716606939095918717, guid: 344a0540153ac8349a3621dedf3176f4, type: 3}
+  - {fileID: 8462896245922310192, guid: 9f791fdd84eaa6e4ba9fa93ba5a535f4, type: 3}
+  - {fileID: 10659992136488069, guid: 50814e2a60818ee44bd3ca19cbedf69b, type: 3}
+  - {fileID: 7639237234536059179, guid: ba4f26fb4c2ba5842b64bd626a0f0ad9, type: 3}
+  - {fileID: 9131605515209404983, guid: aa9f4b98e0ba4494c959b280723b4ec8, type: 3}
+  - {fileID: 6537352590377068077, guid: 06ad79a395eacae4ebcbbce2eda713f7, type: 3}
+  - {fileID: 4754959996066532538, guid: 8adedef7525904444b957bc1ee466166, type: 3}
+  - {fileID: 5475542907530126426, guid: 1eeeeae94d76e3c44a61807578d57b98, type: 3}
+  starPrefabs:
+  - {fileID: 6510165111226306119, guid: c8d010665f1c4894083b5e1c5cece635, type: 3}
+  - {fileID: 3562865947497260774, guid: b633eba8007bbc742bcfb2e795184783, type: 3}
+  - {fileID: 6570077110852010904, guid: 8c5e324600ec17f47aab128e88ef7040, type: 3}
+  - {fileID: 5211730280416702523, guid: 74742827945868245a722fb966bca161, type: 3}
+  - {fileID: 5867041165326355376, guid: 2e2539523c98e214a984366be3bc11bd, type: 3}
+  - {fileID: 5842665081013775249, guid: 8274ab7f47bf058449bafc70138fff05, type: 3}
+  - {fileID: 3496945868063779512, guid: 953af25ca947a7248a6e1d7250f36504, type: 3}
+  - {fileID: 1342378932038674505, guid: bbadf4cfe9b514c448cb822aaef1076c, type: 3}
+  - {fileID: 265048486520325896, guid: 4ae7c667c094f9d41b3bd39709768a6c, type: 3}
+  - {fileID: 2326142371322484274, guid: ec05a35677a210d4293bd8a0cfec2af4, type: 3}
+  - {fileID: 6807391400900598100, guid: 92337a532c8ba894f999e301b6b28175, type: 3}
+  - {fileID: 5616271712982262348, guid: e9978fb16c4cca44590cc390ea88c50c, type: 3}
+  - {fileID: 8967227276017417929, guid: f6129ee742b389f46b37cb6127cdad88, type: 3}
+  - {fileID: 5719646708687317640, guid: 934dcb6b8d20bab47a037ef2133e73c7, type: 3}
+  - {fileID: 9079645086124268736, guid: c2c451ad4e91de84398dc9fc499ce164, type: 3}
+  moonPrefabs:
+  - {fileID: 8882284752218281952, guid: 1290b375e4ff50443b8db12d7ffa0f2a, type: 3}
+  - {fileID: 2380940152947815654, guid: 5632a05a04168614fad1d03b3fea2836, type: 3}
+  - {fileID: 8096429000623004604, guid: 3bb51f531e8c1dc4284684963fdd77f2, type: 3}
+  - {fileID: 3499912183095476197, guid: ff9c155a4dd560c4b96a6f288ee3cef5, type: 3}
+  - {fileID: 7628490693653739770, guid: d8c874844a6914f4c91e5b41a3c6157e, type: 3}
+  - {fileID: 1159131024800371717, guid: 9ce9c294507cccf43b16e91534e6e928, type: 3}
+  - {fileID: 5058600118649589686, guid: a4f7e79e6e4f5104eb9a1892e133a75e, type: 3}
+  - {fileID: 6375990947770316024, guid: fdb9e66cf1f6d3748857f5d5dcb9137c, type: 3}
+  - {fileID: 4324941240042397250, guid: 4f6d9a8b254440c41b053b36fb6194d4, type: 3}
+  - {fileID: 378346187010763686, guid: 8bf5f6b247f8aa0428b891edfc158e98, type: 3}
+  - {fileID: 773260309515464440, guid: 2ae7be40c0b11654ba6d19152d81310e, type: 3}
+  - {fileID: 7333059090962021027, guid: cb69897cdebba28488ccddb935535355, type: 3}
+  - {fileID: 5131190011267023262, guid: 8ad234940f74dd241ac503c4d4522aaa, type: 3}
+  - {fileID: 6995148341764575398, guid: f4d6843dda7a30f4fbe84fd848eeeeba, type: 3}
+  - {fileID: 6047388757133022374, guid: 40d8cd3afd95fbd4589e751d1302e6f7, type: 3}
+  sunPrefabs:
+  - {fileID: 3240821434680004868, guid: 88672e8bb1a72384d82c1a7accfcf2aa, type: 3}
+  - {fileID: 3732546265081963443, guid: b3eb8e75cb0880f448ce89d52d46df1f, type: 3}
+  - {fileID: 7996924875676234063, guid: 9916c850bafd3ac469eb95fd117a2161, type: 3}
+  - {fileID: 8576672044129733331, guid: bfe306f706de24846a17963ea53e8a7c, type: 3}
+  - {fileID: 22237654306907778, guid: 6eec283ea35e0bd4bbcf3dd70ecbba6a, type: 3}
+  - {fileID: 5574863774902195592, guid: 1cefd9d220844454aa4fbdeb549ef3b7, type: 3}
+  - {fileID: 4900247918820734517, guid: 4243c5872759e7e469efc45b9890f890, type: 3}
+  - {fileID: 9076155281164926130, guid: 4476b602b6fafbe4fabe644363cba791, type: 3}
+  - {fileID: 2498072916335166916, guid: 895f5febe9f612f4181f416d42019769, type: 3}
+  - {fileID: 2027013951847391262, guid: 1b2ab6f0a334ad642a669071b065c0aa, type: 3}
+  - {fileID: 77357478788095616, guid: 4eec33f197388db4a951c1a94b977ccf, type: 3}
+  - {fileID: 1314913163555852559, guid: 2885adf3dc2608e4e9e0be0ea34fe529, type: 3}
+  - {fileID: 3202671538907132442, guid: 3cc93fd07aacd9f469ef6221dc88d542, type: 3}
+  - {fileID: 5572312615114584813, guid: afe8f0266e0addd4aad66bba78a84e89, type: 3}
+  - {fileID: 2164463964230366414, guid: d528b9770ced88244a31bf069a5a0a45, type: 3}
+  backPrefab: {fileID: 3240821434680004868, guid: 610e6491df2164846a031754ba96c508, type: 3}
