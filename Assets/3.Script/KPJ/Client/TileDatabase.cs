@@ -27,7 +27,7 @@ public class TileDatabase : ScriptableObject
         return prefab;
     }
 
-    public void SetPrefab(Suit suit, int number, GameObject prefab)
+    public void SetPrefab(TileSuit suit, int number, GameObject prefab)
     {
         GetSuitPrefabs(suit)[number - 1] = prefab;
     }
@@ -37,18 +37,18 @@ public class TileDatabase : ScriptableObject
         backPrefab = prefab;
     }
 
-    private GameObject[] GetSuitPrefabs(Suit suit)
+    private GameObject[] GetSuitPrefabs(TileSuit suit)
     {
         GameObject[] prefabs;
         switch (suit)
         {
-            case Suit.Cloud:
+            case TileSuit.Cloud:
                 prefabs = cloudPrefabs;
                 break;
-            case Suit.Star:
+            case TileSuit.Star:
                 prefabs = starPrefabs;
                 break;
-            case Suit.Moon:
+            case TileSuit.Moon:
                 prefabs = moonPrefabs;
                 break;
             default:

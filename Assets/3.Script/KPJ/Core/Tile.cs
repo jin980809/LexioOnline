@@ -1,7 +1,7 @@
 using System;
 
 // 문양 서열: 구름 < 별 < 달 < 해
-public enum Suit
+public enum TileSuit
 {
     Cloud = 0,
     Star = 1,
@@ -11,10 +11,10 @@ public enum Suit
 
 public readonly struct Tile : IEquatable<Tile>
 {
-    public Suit Suit { get; }
+    public TileSuit Suit { get; }
     public int Number { get; }
 
-    public Tile(Suit suit, int number)
+    public Tile(TileSuit suit, int number)
     {
         Suit = suit;
         Number = number;
@@ -23,7 +23,7 @@ public readonly struct Tile : IEquatable<Tile>
     // 네트워크로 받은 1바이트 ID에서 복원
     public Tile(byte id)
     {
-        Suit = (Suit)(id / 16);
+        Suit = (TileSuit)(id / 16);
         Number = id % 16;
     }
 

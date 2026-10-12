@@ -1,7 +1,7 @@
 using Mirror;
 
 // 접속한 클라이언트 1명. 입력(Command)과 개인 정보(손패 TargetRpc) 전달 담당
-// 클라이언트 쪽 수신 내용은 LexioNetworkManager로 넘겨서 UI/뷰가 받음
+// 클라이언트 쪽 수신 내용은 LexioTableNetworkManager로 넘겨서 UI/뷰가 받음
 public class LexioPlayer : NetworkBehaviour
 {
     public const int MaxNicknameLength = 12;
@@ -23,7 +23,7 @@ public class LexioPlayer : NetworkBehaviour
 
     public override void OnStartLocalPlayer()
     {
-        LexioNetworkManager manager = GetManager();
+        LexioTableNetworkManager manager = GetManager();
         if (manager != null)
         {
             manager.RegisterLocalPlayer(this);
@@ -33,7 +33,7 @@ public class LexioPlayer : NetworkBehaviour
 
     public override void OnStopLocalPlayer()
     {
-        LexioNetworkManager manager = GetManager();
+        LexioTableNetworkManager manager = GetManager();
         if (manager != null)
         {
             manager.UnregisterLocalPlayer(this);
@@ -88,7 +88,7 @@ public class LexioPlayer : NetworkBehaviour
     [TargetRpc]
     public void TargetSetHand(byte[] tileIds, bool isNewDeal, int mySeat, int playerCount)
     {
-        LexioNetworkManager manager = GetManager();
+        LexioTableNetworkManager manager = GetManager();
         if (manager != null)
         {
             manager.RaiseHandReceived(tileIds, isNewDeal, mySeat, playerCount);
@@ -98,7 +98,7 @@ public class LexioPlayer : NetworkBehaviour
     [TargetRpc]
     public void TargetNotice(string message)
     {
-        LexioNetworkManager manager = GetManager();
+        LexioTableNetworkManager manager = GetManager();
         if (manager != null)
         {
             manager.RaiseNotice(message);
@@ -106,8 +106,8 @@ public class LexioPlayer : NetworkBehaviour
     }
 
     // 스폰된 오브젝트라 씬 참조를 받을 수 없어서 Mirror의 NetworkManager.singleton 사용
-    private LexioNetworkManager GetManager()
+    private LexioTableNetworkManager GetManager()
     {
-        return NetworkManager.singleton as LexioNetworkManager;
+        return NetworkManager.singleton as LexioTableNetworkManager;
     }
 }

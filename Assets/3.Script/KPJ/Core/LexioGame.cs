@@ -60,7 +60,7 @@ public sealed class LexioGame
         {
             for (int number = 1; number <= MaxNumber; number++)
             {
-                deck.Add(new Tile((Suit)suit, number));
+                deck.Add(new Tile((TileSuit)suit, number));
             }
         }
 
@@ -73,7 +73,7 @@ public sealed class LexioGame
         }
 
         int tilesPerPlayer = GameRules.GetTilesPerPlayer(PlayerCount);
-        Tile cloudThree = new Tile(Suit.Cloud, 3);
+        Tile cloudThree = new Tile(TileSuit.Cloud, 3);
         for (int seat = 0; seat < PlayerCount; seat++)
         {
             hands[seat].Clear();

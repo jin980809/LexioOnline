@@ -4,7 +4,7 @@ using UnityEngine;
 
 // 네트워크 시작/접속 처리 + 클라이언트 쪽 연결 허브
 // 스폰된 테이블/로컬 플레이어를 여기에 등록하고, UI/뷰는 인스펙터로 이 매니저만 참조함
-public class LexioNetworkManager : NetworkManager
+public class LexioTableNetworkManager : NetworkManager
 {
     // Server 씬에서는 true: 실행하면 바로 서버 시작 (에디터/헤드리스 빌드 공통)
     [SerializeField] private bool startAsServer;

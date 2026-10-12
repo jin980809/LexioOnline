@@ -116,7 +116,7 @@ public class LexioSetup
                 {
                     Debug.LogWarning("[Lexio] 타일 프리팹 없음: " + path);
                 }
-                database.SetPrefab((Suit)suit, number, prefab);
+                database.SetPrefab((TileSuit)suit, number, prefab);
             }
         }
         database.SetBackPrefab(AssetDatabase.LoadAssetAtPath<GameObject>(TilePrefabFolder + "/Back.prefab"));
@@ -238,7 +238,7 @@ public class LexioSetup
         DestroyRoot("EventSystem");
         DestroyRoot("Table");
 
-        LexioNetworkManager manager = CreateNetworkManager(playerPrefab, tablePrefab, false);
+        LexioTableNetworkManager manager = CreateNetworkManager(playerPrefab, tablePrefab, false);
 
         Camera viewCamera = Camera.main;
         if (viewCamera != null)
@@ -269,13 +269,13 @@ public class LexioSetup
         EditorSceneManager.SaveScene(scene);
     }
 
-    private LexioNetworkManager CreateNetworkManager(GameObject playerPrefab, GameObject tablePrefab, bool startAsServer)
+    private LexioTableNetworkManager CreateNetworkManager(GameObject playerPrefab, GameObject tablePrefab, bool startAsServer)
     {
         GameObject managerObject = new GameObject("NetworkManager");
         KcpTransport transport = managerObject.AddComponent<KcpTransport>();
         transport.port = ServerPort;
 
-        LexioNetworkManager manager = managerObject.AddComponent<LexioNetworkManager>();
+        LexioTableNetworkManager manager = managerObject.AddComponent<LexioTableNetworkManager>();
         manager.transport = transport;
         manager.playerPrefab = playerPrefab;
         manager.spawnPrefabs = new List<GameObject> { tablePrefab };
@@ -288,7 +288,7 @@ public class LexioSetup
 
     // ---------------- UI ----------------
 
-    private void CreateUi(LexioNetworkManager manager, LexioClientView clientView, Sprite ruleBookSprite)
+    private void CreateUi(LexioTableNetworkManager manager, LexioClientView clientView, Sprite ruleBookSprite)
     {
         GameObject canvasObject = new GameObject("LexioCanvas");
         Canvas canvas = canvasObject.AddComponent<Canvas>();

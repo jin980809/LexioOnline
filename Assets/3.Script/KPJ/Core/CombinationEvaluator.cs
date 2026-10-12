@@ -126,12 +126,12 @@ public static class CombinationEvaluator
         }
         else if (fourNumber > 0)
         {
-            Tile fourTile = new Tile(Suit.Cloud, fourNumber);
+            Tile fourTile = new Tile(TileSuit.Cloud, fourNumber);
             result = new Combination(CombinationType.FourCard, tiles, fourTile.GetRank(maxNumber));
         }
         else if (threeNumber > 0 && pairNumber > 0)
         {
-            Tile threeTile = new Tile(Suit.Cloud, threeNumber);
+            Tile threeTile = new Tile(TileSuit.Cloud, threeNumber);
             result = new Combination(CombinationType.FullHouse, tiles, threeTile.GetRank(maxNumber));
         }
         else if (isFlush)
@@ -205,7 +205,7 @@ public static class CombinationEvaluator
 
                 if (order >= 0)
                 {
-                    Suit topSuit = Suit.Cloud;
+                    TileSuit topSuit = TileSuit.Cloud;
                     for (int i = 0; i < tiles.Count; i++)
                     {
                         if (tiles[i].Number == topNumber)

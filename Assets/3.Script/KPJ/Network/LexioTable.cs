@@ -111,7 +111,7 @@ public class LexioTable : NetworkBehaviour
     public override void OnStartClient()
     {
         Version++;
-        LexioNetworkManager manager = NetworkManager.singleton as LexioNetworkManager;
+        LexioTableNetworkManager manager = NetworkManager.singleton as LexioTableNetworkManager;
         if (manager != null)
         {
             manager.RegisterTable(this);
@@ -120,7 +120,7 @@ public class LexioTable : NetworkBehaviour
 
     public override void OnStopClient()
     {
-        LexioNetworkManager manager = NetworkManager.singleton as LexioNetworkManager;
+        LexioTableNetworkManager manager = NetworkManager.singleton as LexioTableNetworkManager;
         if (manager != null)
         {
             manager.UnregisterTable(this);

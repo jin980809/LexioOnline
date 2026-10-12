@@ -26,7 +26,7 @@ public class LexioUI : MonoBehaviour
     }
 
     [Header("References")]
-    [SerializeField] private LexioNetworkManager networkManager;
+    [SerializeField] private LexioTableNetworkManager networkManager;
     [SerializeField] private LexioClientView clientView;
 
     [Header("Connect")]

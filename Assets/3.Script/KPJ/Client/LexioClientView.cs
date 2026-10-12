@@ -16,7 +16,7 @@ public enum HandSortMode
 public class LexioClientView : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private LexioNetworkManager networkManager;
+    [SerializeField] private LexioTableNetworkManager networkManager;
     [SerializeField] private TileDatabase tileDatabase;
     [SerializeField] private Material outlineMaterial;
     [SerializeField] private Camera viewCamera;
@@ -1250,7 +1250,7 @@ public class LexioClientView : MonoBehaviour
             GameObject prefab = null;
             if (tileDatabase != null)
             {
-                prefab = tileDatabase.GetPrefab(new Tile(Suit.Cloud, 3));
+                prefab = tileDatabase.GetPrefab(new Tile(TileSuit.Cloud, 3));
             }
             if (prefab != null)
             {
