@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6163665428091016463}
   - component: {fileID: 7306327360143235313}
   - component: {fileID: 1943202503935937245}
+  - component: {fileID: 8622311449373600928}
   m_Layer: 0
   m_Name: LexioPlayer
   m_TagString: Untagged
@@ -65,3 +66,19 @@ MonoBehaviour:
   syncDirection: 0
   syncMode: 0
   syncInterval: 0
+--- !u!114 &8622311449373600928
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7141768817178057225}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d17e718851449a6879986e45c458fb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror.Components::Mirror.NetworkMatch
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  MatchID: 
