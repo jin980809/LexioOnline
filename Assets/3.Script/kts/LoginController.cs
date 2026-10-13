@@ -29,9 +29,10 @@ public class LoginController : MonoBehaviour
         }
 
         if (DBManager.instance.Login(ID_input.text, PW_input.text))
-        {//로그인이 성공되었다
+        {
+            //로그인이 성공되었다
             UserInfo info = DBManager.instance.info;
-            Debug.Log($"{info.userName} | {info.userID} | {info.first} | {info.second} | {info.third} | {info.fourth} | {info.playNum} | {info.averageRank}");
+            Debug.Log($"{info.userName} | {info.userID} | {info.imageNum} | {info.first} | {info.second} | {info.third} | {info.fourth} | {info.playNum} | {info.averageRank}");
             gameObject.SetActive(false);
         }
         else

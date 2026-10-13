@@ -41,6 +41,10 @@ public class SignUpController : MonoBehaviour
             {
                 SignUpText_viewing("아이디가 중복됩니다");
             }
+            else if (!DBManager.instance.selectImage)
+            {
+                SignUpText_viewing("이미지를 선택하세요");
+            }
             else
             {
                 SignUpText_viewing("닉네임이 중복됩니다");
