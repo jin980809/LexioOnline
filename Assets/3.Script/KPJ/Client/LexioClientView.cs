@@ -28,7 +28,7 @@ public class LexioClientView : MonoBehaviour
     [SerializeField] private Color selectedTint = new Color(1f, 0.95f, 0.7f, 1f);
 
     [Header("Hand (내 패)")]
-    [SerializeField] private Vector3 handCenter = new Vector3(0f, 0.55f, -4.5f);
+    [SerializeField] private Vector3 handCenter = new Vector3(1.2f, 0.55f, -5f);
     [SerializeField] private Vector3 handTileEuler = new Vector3(20f, 0f, 0f);
 
     [Header("Hand Slots (손패 칸 / 드래그 배치)")]
@@ -60,6 +60,10 @@ public class LexioClientView : MonoBehaviour
     [SerializeField] private float opponentSpacingRatio = 0.55f;
     [SerializeField] private Vector3 backTileEuler = Vector3.zero;
     [SerializeField] private float labelHeight = 1.4f;
+
+    [Header("Chips (정산 칩이 출발/도착하는 자리)")]
+    // 손패/상대 패 줄에서 테이블 가운데 쪽으로 떨어진 거리
+    [SerializeField] private float chipFrontGap = 0.8f;
 
     [Header("Deal (라운드 시작 패 돌리기)")]
     // 서버 LexioTable.dealSeconds보다 짧아야 연출 중에 턴이 시작되지 않음
@@ -119,6 +123,8 @@ public class LexioClientView : MonoBehaviour
     private readonly Vector3[] seatAnchors = new Vector3[GameRules.MaxPlayers];
     private readonly bool[] hasSeatAnchor = new bool[GameRules.MaxPlayers];
     private readonly int[] seatBackStarts = new int[GameRules.MaxPlayers];
+    private readonly Vector3[] chipAnchors = new Vector3[GameRules.MaxPlayers];
+    private readonly bool[] hasChipAnchor = new bool[GameRules.MaxPlayers];
     private readonly List<DealFlight> dealFlights = new List<DealFlight>();
     private readonly List<PlayFlight> playFlights = new List<PlayFlight>();
     private readonly Dictionary<byte, PlayOrigin> playOrigins = new Dictionary<byte, PlayOrigin>();
@@ -285,6 +291,19 @@ public class LexioClientView : MonoBehaviour
         if (seat >= 0 && seat < hasSeatAnchor.Length && hasSeatAnchor[seat])
         {
             position = seatAnchors[seat];
+            result = true;
+        }
+        return result;
+    }
+
+    // 정산 칩이 출발/도착하는 자리 (테이블 면 높이, 패 줄 앞쪽)
+    public bool TryGetChipAnchor(int seat, out Vector3 position)
+    {
+        bool result = false;
+        position = Vector3.zero;
+        if (seat >= 0 && seat < hasChipAnchor.Length && hasChipAnchor[seat])
+        {
+            position = chipAnchors[seat];
             result = true;
         }
         return result;
@@ -934,6 +953,7 @@ public class LexioClientView : MonoBehaviour
             {
                 shownTileCounts[seat] = 0;
                 hasSeatAnchor[seat] = false;
+                hasChipAnchor[seat] = false;
             }
             for (int seat = 0; seat < playerCount; seat++)
             {
@@ -961,7 +981,11 @@ public class LexioClientView : MonoBehaviour
         float radiusZ = opponentRadiusZ * radiusScale;
         for (int seat = 0; seat < playerCount; seat++)
         {
-            if (seat != mySeat)
+            if (seat == mySeat)
+            {
+                SetMyChipAnchor(seat);
+            }
+            else
             {
                 // 내 자리(아래, -90도)에서 반시계 방향으로 차례대로 배치
                 int relative = (seat - mySeat + playerCount) % playerCount;
@@ -974,6 +998,9 @@ public class LexioClientView : MonoBehaviour
                 Quaternion facing = Quaternion.LookRotation(toCenter, Vector3.up);
                 Vector3 rowDirection = facing * Vector3.right;
                 Quaternion rotation = facing * Quaternion.Euler(backTileEuler);
+
+                chipAnchors[seat] = anchor + toCenter * chipFrontGap;
+                hasChipAnchor[seat] = true;
 
                 int count = shownTileCounts[seat];
                 seatBackStarts[seat] = activeBackCount;
@@ -989,6 +1016,14 @@ public class LexioClientView : MonoBehaviour
                 }
             }
         }
+    }
+
+    // 내 칩 자리: 손패 맨 뒷줄에서 테이블 가운데 쪽
+    private void SetMyChipAnchor(int seat)
+    {
+        float backRowZ = handCenter.z + GetRowOffset().z * (handSlotRows - 1);
+        chipAnchors[seat] = new Vector3(handCenter.x, 0f, backRowZ + chipFrontGap);
+        hasChipAnchor[seat] = true;
     }
 
     private GameObject AcquireBackTile()
@@ -1043,6 +1078,7 @@ public class LexioClientView : MonoBehaviour
             {
                 shownTileCounts[seat] = 0;
                 hasSeatAnchor[seat] = false;
+                hasChipAnchor[seat] = false;
             }
             for (int seat = 0; seat < playerCount; seat++)
             {
@@ -1310,6 +1346,7 @@ public class LexioClientView : MonoBehaviour
         {
             shownTileCounts[seat] = 0;
             hasSeatAnchor[seat] = false;
+            hasChipAnchor[seat] = false;
         }
         NotifySelectionChanged();
     }

@@ -17,10 +17,12 @@ public struct SeatInfo : IEquatable<SeatInfo>
     public bool isAi;
     // 패 정리 시간에 준비 완료를 눌렀는지 (라운드마다 초기화)
     public bool isReady;
+    // 라운드 정산 기준 장수 (2를 든 만큼 늘어난 남은 장수). 정산 연출에서 누가 누구에게 주는지 계산용, 라운드 중에는 0
+    public int settleCount;
 
     public bool Equals(SeatInfo other)
     {
-        return nickname == other.nickname && chips == other.chips && tileCount == other.tileCount && isAi == other.isAi && isReady == other.isReady;
+        return nickname == other.nickname && chips == other.chips && tileCount == other.tileCount && isAi == other.isAi && isReady == other.isReady && settleCount == other.settleCount;
     }
 
     public override bool Equals(object obj)
@@ -35,6 +37,6 @@ public struct SeatInfo : IEquatable<SeatInfo>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(nickname, chips, tileCount, isAi, isReady);
+        return HashCode.Combine(nickname, chips, tileCount, isAi, isReady, settleCount);
     }
 }

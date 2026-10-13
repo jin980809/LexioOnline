@@ -2,18 +2,18 @@ using System.Collections.Generic;
 
 public static class ScoreCalculator
 {
-    // 2를 n장 들고 있으면 남은 장수 × (n + 1)
+    // 2를 1장 들 때마다 2배 (n장이면 남은 장수 × 2^n)
     public static int GetEffectiveCount(IReadOnlyList<Tile> hand)
     {
-        int twoCount = 0;
+        int multiplier = 1;
         for (int i = 0; i < hand.Count; i++)
         {
             if (hand[i].Number == 2)
             {
-                twoCount++;
+                multiplier *= 2;
             }
         }
-        return hand.Count * (twoCount + 1);
+        return hand.Count * multiplier;
     }
 
     // 모든 쌍에 대해 유효 장수가 많은 쪽이 차이만큼 적은 쪽에게 지급

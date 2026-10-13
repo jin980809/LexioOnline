@@ -28,6 +28,8 @@ public class LexioUI : MonoBehaviour
     [Header("References")]
     [SerializeField] private LexioTableNetworkManager networkManager;
     [SerializeField] private LexioClientView clientView;
+    // 정산 중 칩 숫자를 칩이 오가는 대로 1씩 바꿔 보여주기 위해 사용
+    [SerializeField] private ChipFlightView chipView;
 
     [Header("Connect")]
     [SerializeField] private GameObject connectPanel;
@@ -92,6 +94,7 @@ public class LexioUI : MonoBehaviour
     private bool wasPreparing;
     private int cachedVersion = -1;
     private int cachedSeat = -1;
+    private int cachedChipVersion = -1;
     private int shownSeconds = -1;
     private float noticeHideTime;
 
@@ -172,10 +175,11 @@ public class LexioUI : MonoBehaviour
                 cachedVersion = -1;
             }
 
-            if (table.Version != cachedVersion || local.Seat != cachedSeat)
+            if (table.Version != cachedVersion || local.Seat != cachedSeat || chipView.ChipVersion != cachedChipVersion)
             {
                 cachedVersion = table.Version;
                 cachedSeat = local.Seat;
+                cachedChipVersion = chipView.ChipVersion;
                 isSelectionDirty = true;
                 RefreshState(table, local.Seat, showLobby, showGame, showResult);
             }
@@ -291,7 +295,7 @@ public class LexioUI : MonoBehaviour
 
     private void RefreshGame(LexioTable table, int mySeat)
     {
-        roundText.text = "라운드 " + table.RoundNumber + " / " + GameRules.RoundCount;
+        roundText.text = "라운드 " + table.RoundNumber + " / " + table.RoundCount;
 
         if (table.IsPreparing)
         {
@@ -340,7 +344,7 @@ public class LexioUI : MonoBehaviour
         {
             SeatInfo mine = table.Seats[mySeat];
             builder.Clear();
-            builder.Append(mine.nickname).Append("   칩 ").Append(mine.chips).Append("   남은 패 ").Append(mine.tileCount).Append("장");
+            builder.Append(mine.nickname).Append("\n칩 ").Append(chipView.GetShownChips(mySeat, mine.chips)).Append("\n남은 패 ").Append(mine.tileCount).Append("장");
             myInfoText.text = builder.ToString();
         }
 
@@ -410,6 +414,8 @@ public class LexioUI : MonoBehaviour
         }
         bool isMeReady = mySeat >= 0 && mySeat < table.Seats.Count && table.Seats[mySeat].isReady;
         SetActive(readyButton.gameObject, isPreparing);
+        // 준비 완료 버튼이 제출 버튼 자리를 같이 쓰므로, 패 정리 시간에는 제출 버튼을 숨김
+        SetActive(submitButton.gameObject, isPreparing == false);
         readyButton.interactable = isPreparing && isDealing == false && isMeReady == false && isReadyRequested == false;
     }
 
@@ -453,7 +459,7 @@ public class LexioUI : MonoBehaviour
                 {
                     builder.Append(" (AI)");
                 }
-                builder.Append("\n칩 ").Append(info.chips).Append(" · ").Append(info.tileCount).Append("장");
+                builder.Append("\n칩 ").Append(chipView.GetShownChips(i, info.chips)).Append(" · ").Append(info.tileCount).Append("장");
                 if (table.IsPreparing && info.isReady)
                 {
                     builder.Append(" · 준비");

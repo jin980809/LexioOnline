@@ -1,0 +1,23 @@
+# MTL file - created by a modified js OBJExporter
+
+newmtl Chip_Color
+Tr 0.0000
+Tf 1.0000 1.0000 1.0000
+illum 1
+Pr 0.5
+Pds 1
+Pl 1
+Ka 1 1 1
+Kd 0.5173235319843004 0.1520245711172085 0.03212899769612878
+Ke 0 0 0
+
+newmtl Chip_white
+Tr 0.0000
+Tf 1.0000 1.0000 1.0000
+illum 1
+Pr 0.5
+Pds 1
+Pl 1
+Ka 1 1 1
+Kd 0.800000048385714 0.800000048385714 0.800000048385714
+Ke 0 0 0

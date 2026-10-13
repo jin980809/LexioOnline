@@ -8,13 +8,20 @@ public class LexioTable : NetworkBehaviour
 {
     [SerializeField] private float turnSeconds = 30f;
     [SerializeField] private float aiDelaySeconds = 1f;
-    [SerializeField] private float roundEndDelaySeconds = 2.5f;
+    // 라운드 끝 → 다음 라운드(또는 결과 화면)까지 대기. 클라이언트 ChipFlightView.maxSettleSeconds보다 길게 (정산 칩 연출 시간)
+    [SerializeField] private float roundEndDelaySeconds = 5f;
 
     // 라운드 시작 패 돌리기 연출 시간. 클라이언트 LexioClientView.dealSeconds보다 조금 길게 (지연 여유)
     [SerializeField] private float dealSeconds = 2f;
 
     // 매 라운드 패를 받은 뒤 패를 보고 칸에 배치하는 시간. 이 동안은 아무도 낼 수 없음
     [SerializeField] private float prepareSeconds = 60f;
+
+    // 한 게임에 진행할 라운드 수. 서버 프리팹 값이 기준이고, 클라이언트에는 SyncVar로 전달되어 UI 표시에 쓰임
+    [SerializeField, Min(1), SyncVar] private int roundCount = GameRules.RoundCount;
+
+    // 게임 시작 시 각자 받는 칩 개수 (서버 전용, 클라이언트는 SeatInfo.chips로 받음)
+    [SerializeField, Min(0)] private int startingChips = GameRules.StartingChips;
 
     [SyncVar(hook = nameof(OnPhaseChanged))] private GamePhase phase = GamePhase.Waiting;
     [SyncVar(hook = nameof(OnIntChanged))] private int maxNumber;
@@ -50,6 +57,11 @@ public class LexioTable : NetworkBehaviour
     public int RoundNumber
     {
         get { return roundNumber; }
+    }
+
+    public int RoundCount
+    {
+        get { return roundCount; }
     }
 
     public int CurrentSeat
@@ -161,7 +173,7 @@ public class LexioTable : NetworkBehaviour
         seatPlayers.Add(player);
         SeatInfo info = new SeatInfo();
         info.nickname = "Player" + seatPlayers.Count;
-        info.chips = GameRules.StartingChips;
+        info.chips = startingChips;
         seats.Add(info);
         player.SetSeat(seatPlayers.Count - 1);
 
@@ -190,9 +202,15 @@ public class LexioTable : NetworkBehaviour
             {
                 // 재접속 없음: 남은 판은 AI가 대신함
                 seatPlayers[seat] = null;
-                SeatInfo info = seats[seat];
-                info.isAi = true;
-                seats[seat] = info;
+                // 게임이 끝난 뒤(결과 화면, 마지막 라운드 정산 대기 포함) 나간 사람은 AI로 바꾸지 않음
+                // 자리 정보는 그대로 둬서 남은 사람의 결과 화면에 이름/칩이 그대로 보임
+                bool isGameOver = phase == GamePhase.Finished || (game != null && game.IsFinished);
+                if (isGameOver == false)
+                {
+                    SeatInfo info = seats[seat];
+                    info.isAi = true;
+                    seats[seat] = info;
+                }
                 turnStartTime = NetworkTime.time;
 
                 if (HasHumanPlayer() == false)
@@ -400,7 +418,7 @@ public class LexioTable : NetworkBehaviour
     [Server]
     private void StartGame()
     {
-        game = new LexioGame(seats.Count, random);
+        game = new LexioGame(seats.Count, roundCount, startingChips, random);
         maxNumber = game.MaxNumber;
         phase = GamePhase.Playing;
         StartRound();
@@ -468,6 +486,12 @@ public class LexioTable : NetworkBehaviour
             SeatInfo info = seats[seat];
             info.chips = game.GetChips(seat);
             info.tileCount = game.GetHand(seat).Count;
+            // 정산 기준 장수는 칩과 같은 동기화에 실려야 클라이언트가 주고받는 순서를 계산할 수 있음
+            info.settleCount = 0;
+            if (game.LastEffectiveCounts != null)
+            {
+                info.settleCount = game.LastEffectiveCounts[seat];
+            }
             seats[seat] = info;
         }
 

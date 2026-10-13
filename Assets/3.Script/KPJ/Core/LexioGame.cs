@@ -10,6 +10,8 @@ public sealed class LexioGame
 
     public int PlayerCount { get; }
     public int MaxNumber { get; }
+    // 한 게임에 진행할 라운드 수
+    public int RoundCount { get; }
     public int RoundNumber { get; private set; }
     public int CurrentSeat { get; private set; } = -1;
     public int LastPlaySeat { get; private set; } = -1;
@@ -23,15 +25,19 @@ public sealed class LexioGame
 
     public int[] LastChipChanges { get; private set; }
 
-    public LexioGame(int playerCount, Random random)
+    // 직전 라운드 정산 기준 장수 (2를 든 만큼 늘어난 남은 장수). 클라이언트 정산 연출용
+    public int[] LastEffectiveCounts { get; private set; }
+
+    public LexioGame(int playerCount, int roundCount, int startingChips, Random random)
     {
         PlayerCount = playerCount;
+        RoundCount = roundCount;
         MaxNumber = GameRules.GetMaxNumber(playerCount);
         this.random = random;
         chips = new int[playerCount];
         for (int i = 0; i < playerCount; i++)
         {
-            chips[i] = GameRules.StartingChips;
+            chips[i] = startingChips;
             hands.Add(new List<Tile>());
         }
     }
@@ -54,6 +60,7 @@ public sealed class LexioGame
         LastPlaySeat = -1;
         WasTrickCleared = false;
         LastChipChanges = null;
+        LastEffectiveCounts = null;
 
         List<Tile> deck = new List<Tile>();
         for (int suit = 0; suit < GameRules.SuitCount; suit++)
@@ -191,6 +198,7 @@ public sealed class LexioGame
             effectiveCounts[seat] = ScoreCalculator.GetEffectiveCount(hands[seat]);
         }
 
+        LastEffectiveCounts = effectiveCounts;
         LastChipChanges = ScoreCalculator.CalculateChipChanges(effectiveCounts);
         for (int seat = 0; seat < PlayerCount; seat++)
         {
@@ -199,7 +207,7 @@ public sealed class LexioGame
 
         IsRoundOver = true;
         CurrentSeat = -1;
-        if (RoundNumber >= GameRules.RoundCount)
+        if (RoundNumber >= RoundCount)
         {
             IsFinished = true;
         }
