@@ -29,7 +29,8 @@ public class DeleteAccountController : MonoBehaviour
         }
 
         if (DBManager.instance.DeleteAccount(ID_input.text, PW_input.text))
-        {//회원탈퇴에 성공하였다
+        {
+            //회원탈퇴에 성공하였다
             DeleteAccountText_viewing("회원탈퇴가 완료되었습니다");
         }
         else

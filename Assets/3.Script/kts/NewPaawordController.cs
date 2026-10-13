@@ -30,7 +30,8 @@ public class NewPaaswordController : MonoBehaviour
         }
 
         if (DBManager.instance.NewPassword(ID_input.text, PW_input.text, New_PW_input.text))
-        {//비밀번호 변경에 성공
+        {
+            //비밀번호 변경에 성공
             NewPasswordText_viewing("비밀번호가 변경되었습니다");
         }
         else
