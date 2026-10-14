@@ -370,7 +370,7 @@ MonoBehaviour:
   autoCreatePlayer: 0
   playerSpawnMethod: 0
   spawnPrefabs:
-  - {fileID: 8266939966723020079, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
+  - {fileID: 2448850805923437289, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   exceptionsDisconnect: 1
   snapshotSettings:
     bufferTimeMultiplier: 2
@@ -387,9 +387,9 @@ MonoBehaviour:
   evaluationInterval: 3
   timeInterpolationGui: 0
   startAsServer: 0
-  tablePrefab: {fileID: 493788688936497039, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
+  tablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   maxMatches: 20
-  matchTablePrefab: {fileID: 493788688936497039, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
+  matchTablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   autoJoinMatchSize: 0
 --- !u!1 &1974479711
 GameObject:

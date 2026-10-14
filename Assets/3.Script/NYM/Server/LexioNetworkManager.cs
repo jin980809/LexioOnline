@@ -73,7 +73,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
     {
         if (GetAccountKey(conn) == null) return RejectReason.NotLoggedIn;
         if (!LexioProtocol.IsValidMatchSize(request.matchSize)) return RejectReason.InvalidMatchSize;
-        if (connectionMatch.ContainsKey(conn)) return RejectReason.AlreadyInMatch;
+        if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
         if (queuedSize.ContainsKey(conn)) return RejectReason.AlreadyQueued; // 모드 변경은 취소 후 신청
 
         queues[request.matchSize].Add(conn);
@@ -101,8 +101,24 @@ public class LexioNetworkManager : LexioTableNetworkManager
     static RequestResult Result(int requestId, RejectReason reason) =>
         new RequestResult { requestId = requestId, accepted = reason == RejectReason.None, reason = reason };
 
+    // 종료(Finished)된 경기에서만 접속을 유지한 채 빠진다. 남은 사람의 결과 화면이 지워지지 않도록 KPJ ServerRemovePlayer는 부르지 않는다.
+    // 플레이어 파괴 → MatchInterestManagement가 관전 목록을 다시 만들어 이 클라에서 이전 테이블이 사라진다.
+    bool LeaveFinishedMatch(NetworkConnectionToClient conn)
+    {
+        Guid matchId = connectionMatch[conn];
+        if (!matchTables.TryGetValue(matchId, out LexioTable table) || table == null || table.Phase != GamePhase.Finished) return false;
+
+        List<NetworkConnectionToClient> seats = matches[matchId];
+        seats[seats.IndexOf(conn)] = null;
+        connectionMatch.Remove(conn);
+        NetworkServer.RemovePlayerForConnection(conn, RemovePlayerOptions.Destroy);
+
+        if (seats.TrueForAll(seatConn => seatConn == null))
+            EndMatch(matchId);
+        return true;
+    }
+
     // 경기 참가자가 모두 나가면 테이블을 지우고 슬롯을 비운다.
-    // shortcut: 종료(Finished)된 경기도 참가자가 접속을 끊어야 정리된다. 재매칭은 재접속 후 가능. 로비 복귀를 만들 때 여기서 정리.
     void EndMatch(Guid matchId)
     {
         if (!matches.TryGetValue(matchId, out List<NetworkConnectionToClient> seats)) return;
