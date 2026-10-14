@@ -82,6 +82,9 @@ public class LexioUI : MonoBehaviour
     private readonly List<int> resultOrder = new List<int>();
     private int[] resultChips = new int[0];
     private int[] resultRanks = new int[0];
+    private readonly List<int> settleCounts = new List<int>();
+    private int[] settleChanges = new int[0];
+    private bool isSettling;
     private Combination lastPlayCombination;
     private CanvasGroup submitGroup;
     private CanvasGroup passGroup;
@@ -340,11 +343,18 @@ public class LexioUI : MonoBehaviour
             turnText.text = "";
         }
 
+        RefreshSettle(table);
+
         if (mySeat >= 0 && mySeat < table.Seats.Count)
         {
             SeatInfo mine = table.Seats[mySeat];
             builder.Clear();
             builder.Append(mine.nickname).Append("\n칩 ").Append(chipView.GetShownChips(mySeat, mine.chips)).Append("\n남은 패 ").Append(mine.tileCount).Append("장");
+            if (isSettling)
+            {
+                builder.Append("\n정산 ");
+                AppendSettleText(mine, settleChanges[mySeat]);
+            }
             myInfoText.text = builder.ToString();
         }
 
@@ -464,6 +474,11 @@ public class LexioUI : MonoBehaviour
                 {
                     builder.Append(" · 준비");
                 }
+                if (isSettling)
+                {
+                    builder.Append('\n');
+                    AppendSettleText(info, settleChanges[i]);
+                }
                 seatLabelTexts[i].text = builder.ToString();
 
                 if (table.Phase == GamePhase.Playing && table.CurrentSeat == i)
@@ -476,6 +491,43 @@ public class LexioUI : MonoBehaviour
                 }
             }
         }
+    }
+
+    // 라운드 정산 중인지와 자리별 칩 변화. 정산 장수는 라운드가 끝났을 때만 0이 아님 (다음 라운드 시작 때 0으로 돌아감)
+    // 칩 변화는 서버와 같은 계산(ScoreCalculator)을 정산 장수로 다시 해서 얻음
+    private void RefreshSettle(LexioTable table)
+    {
+        isSettling = false;
+        settleCounts.Clear();
+        for (int i = 0; i < table.Seats.Count; i++)
+        {
+            settleCounts.Add(table.Seats[i].settleCount);
+            if (table.Seats[i].settleCount > 0)
+            {
+                isSettling = true;
+            }
+        }
+
+        if (isSettling)
+        {
+            settleChanges = ScoreCalculator.CalculateChipChanges(settleCounts);
+        }
+    }
+
+    // "4장 × 2 = 8 · 칩 -5" (2가 없으면 "4장 · 칩 -5")
+    private void AppendSettleText(SeatInfo info, int change)
+    {
+        builder.Append(info.tileCount).Append("장");
+        if (info.tileCount > 0 && info.settleCount > info.tileCount)
+        {
+            builder.Append(" × ").Append(info.settleCount / info.tileCount).Append(" = ").Append(info.settleCount);
+        }
+        builder.Append(" · 칩 ");
+        if (change > 0)
+        {
+            builder.Append('+');
+        }
+        builder.Append(change);
     }
 
     // 위치 계산만 매 프레임 (할당 없음)

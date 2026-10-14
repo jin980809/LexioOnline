@@ -349,7 +349,7 @@ public class LexioTable : NetworkBehaviour
         {
             if (game.TryPass(seat))
             {
-                AfterTurnChanged();
+                AfterPass(seat);
             }
         }
     }
@@ -410,7 +410,7 @@ public class LexioTable : NetworkBehaviour
         {
             if (game.TryPass(seat))
             {
-                AfterTurnChanged();
+                AfterPass(seat);
             }
         }
     }
@@ -456,19 +456,57 @@ public class LexioTable : NetworkBehaviour
     [Server]
     private void AfterPlay(int seat, List<Tile> tiles)
     {
+        byte[] tileIds = new byte[tiles.Count];
         lastPlayTiles.Clear();
         for (int i = 0; i < tiles.Count; i++)
         {
             lastPlayTiles.Add(tiles[i].Id);
+            tileIds[i] = tiles[i].Id;
         }
         lastPlaySeat = seat;
         SendHand(seat, false);
+        RpcShowPlay(seat, tileIds);
 
         if (game.IsRoundOver)
         {
             isWaitingNextRound = true;
             nextRoundTime = NetworkTime.time + roundEndDelaySeconds;
+            RevealHands();
         }
+        AfterTurnChanged();
+    }
+
+    // 라운드 결과 공개: 모든 자리의 남은 패를 한 번에 보냄 (라운드가 끝났으므로 공개해도 됨)
+    // 자리 순서로 이어 붙인 타일 ID와 자리별 장수를 함께 보냄
+    [Server]
+    private void RevealHands()
+    {
+        int[] counts = new int[seats.Count];
+        int total = 0;
+        for (int seat = 0; seat < seats.Count; seat++)
+        {
+            counts[seat] = game.GetHand(seat).Count;
+            total += counts[seat];
+        }
+
+        byte[] tileIds = new byte[total];
+        int index = 0;
+        for (int seat = 0; seat < seats.Count; seat++)
+        {
+            IReadOnlyList<Tile> hand = game.GetHand(seat);
+            for (int i = 0; i < hand.Count; i++)
+            {
+                tileIds[index] = hand[i].Id;
+                index++;
+            }
+        }
+        RpcRevealHands(tileIds, counts);
+    }
+
+    [Server]
+    private void AfterPass(int seat)
+    {
+        RpcShowPass(seat);
         AfterTurnChanged();
     }
 
@@ -514,6 +552,38 @@ public class LexioTable : NetworkBehaviour
                 tileIds[i] = hand[i].Id;
             }
             player.TargetSetHand(tileIds, isNewDeal, seat, seats.Count);
+        }
+    }
+
+    // 말풍선용: 누가 무엇을 냈는지 / 패스했는지 모든 클라이언트에 알림
+    // 낸 패는 lastPlayTiles로도 동기화되지만, 트릭이 끝나면 바로 비워지므로 따로 보냄
+    [ClientRpc]
+    private void RpcShowPlay(int seat, byte[] tileIds)
+    {
+        LexioTableNetworkManager manager = NetworkManager.singleton as LexioTableNetworkManager;
+        if (manager != null)
+        {
+            manager.RaisePlayReceived(seat, tileIds);
+        }
+    }
+
+    [ClientRpc]
+    private void RpcShowPass(int seat)
+    {
+        LexioTableNetworkManager manager = NetworkManager.singleton as LexioTableNetworkManager;
+        if (manager != null)
+        {
+            manager.RaisePassReceived(seat);
+        }
+    }
+
+    [ClientRpc]
+    private void RpcRevealHands(byte[] tileIds, int[] counts)
+    {
+        LexioTableNetworkManager manager = NetworkManager.singleton as LexioTableNetworkManager;
+        if (manager != null)
+        {
+            manager.RaiseHandsRevealed(tileIds, counts);
         }
     }
 

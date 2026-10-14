@@ -252,7 +252,9 @@ public class LexioSetup
 
         GameObject table = GameObject.CreatePrimitive(PrimitiveType.Plane);
         table.name = "Table";
-        table.transform.localScale = new Vector3(1.6f, 1f, 1.2f);
+        // 화면에서 테이블이 위로 치우쳐 보여서 플레이어 쪽(-Z)으로 조금 내림. 패 배치에는 영향 없음
+        table.transform.position = new Vector3(0f, 0f, -1f);
+        table.transform.localScale = new Vector3(1.8f, 1f, 1.6f);
         Object.DestroyImmediate(table.GetComponent<Collider>());
         table.GetComponent<MeshRenderer>().sharedMaterial = tableMaterial;
 
@@ -357,15 +359,27 @@ public class LexioSetup
         // 오른쪽 위 설정 버튼 (기능 미구현, 버튼만 배치)
         CreateButton("SettingsButton", gamePanel, "설정", Corner(new Vector2(1f, 1f), new Vector2(-40f, -30f), new Vector2(140f, 70f)));
 
+        Sprite bubbleSprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
         RectTransform[] seatLabels = new RectTransform[GameRules.MaxPlayers];
         Text[] seatLabelTexts = new Text[GameRules.MaxPlayers];
+        GameObject[] seatBubbles = new GameObject[GameRules.MaxPlayers];
+        Text[] seatBubbleTexts = new Text[GameRules.MaxPlayers];
         for (int i = 0; i < GameRules.MaxPlayers; i++)
         {
-            Image label = CreatePanel("SeatLabel" + i, gamePanel, new Color(0f, 0f, 0f, 0.6f), Center(Vector2.zero, new Vector2(300f, 96f)));
+            // 라운드 끝에는 정산 줄이 붙어 3줄이 됨
+            Image label = CreatePanel("SeatLabel" + i, gamePanel, new Color(0f, 0f, 0f, 0.6f), Center(Vector2.zero, new Vector2(340f, 124f)));
             label.raycastTarget = false;
             seatLabels[i] = label.rectTransform;
             seatLabelTexts[i] = CreateText("Text", label.transform, "", 28, TextAnchor.MiddleCenter, Stretch(), false);
+            // 상대 말풍선: 이름표 바로 위 (이름표 자식이라 같이 움직이고 같이 꺼짐)
+            seatBubbleTexts[i] = CreateBubble("Bubble", label.transform, Anchored(new Vector2(0.5f, 1f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), Vector2.zero), bubbleSprite);
+            seatBubbles[i] = seatBubbleTexts[i].transform.parent.gameObject;
         }
+
+        ActionBubbleView bubbleView = canvasObject.AddComponent<ActionBubbleView>();
+        SetReference(bubbleView, "networkManager", manager);
+        SetReferenceArray(bubbleView, "seatBubbles", seatBubbles);
+        SetReferenceArray(bubbleView, "seatBubbleTexts", seatBubbleTexts);
 
         // 족보표 서랍: 화면 오른쪽 끝 바깥에 대기(높이 75%), 왼쪽에 붙은 막대 버튼으로 열고 닫음
         // 게임 화면의 마지막 자식이라 다른 게임 UI보다 위에 그려짐
@@ -537,6 +551,40 @@ public class LexioSetup
         Text text = CreateText("Label", image.transform, label, 34, TextAnchor.MiddleCenter, Stretch(), true);
         text.color = new Color(0.1f, 0.08f, 0.05f, 1f);
         return button;
+    }
+
+    // 말풍선: 흰 둥근 사각형 + 아래 가운데 꼬리. 가로/세로 크기는 글자에 맞춰 자동 (layout의 size는 무시됨)
+    // 반환값은 글자. 말풍선 본체는 글자의 부모
+    private Text CreateBubble(string objectName, Transform parent, Layout layout, Sprite bubbleSprite)
+    {
+        Image body = CreatePanel(objectName, parent, Color.white, layout);
+        body.sprite = bubbleSprite;
+        body.type = Image.Type.Sliced;
+        body.raycastTarget = false;
+
+        HorizontalLayoutGroup group = body.gameObject.AddComponent<HorizontalLayoutGroup>();
+        group.padding = new RectOffset(24, 24, 10, 10);
+        group.childAlignment = TextAnchor.MiddleCenter;
+        group.childControlWidth = true;
+        group.childControlHeight = true;
+        group.childForceExpandWidth = false;
+        group.childForceExpandHeight = false;
+        ContentSizeFitter fitter = body.gameObject.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        // 꼬리: 45도 돌린 작은 사각형을 아래 가장자리 가운데에 걸침 (레이아웃 계산에서 제외)
+        Image tail = CreatePanel("Tail", body.transform, Color.white, Anchored(new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(20f, 20f)));
+        tail.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        tail.raycastTarget = false;
+        LayoutElement tailElement = tail.gameObject.AddComponent<LayoutElement>();
+        tailElement.ignoreLayout = true;
+
+        Text text = CreateText("Text", body.transform, "", 30, TextAnchor.MiddleCenter, Stretch(), true);
+        text.color = new Color(0.1f, 0.1f, 0.1f, 1f);
+
+        body.gameObject.SetActive(false);
+        return text;
     }
 
     private InputField CreateInputField(string objectName, Transform parent, string placeholder, Layout layout)
