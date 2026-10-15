@@ -41,7 +41,8 @@ public class LexioClientView : MonoBehaviour
     // 뒷줄을 앞줄 너머로 보이게 올리는 높이 (타일 세로 길이 대비 비율)
     [SerializeField] private float handRowRise = 0.4f;
     [SerializeField] private float dragThresholdPixels = 10f;
-    [SerializeField] private float dragLift = 0.5f;
+    // 드래그 중 패가 칸 사이를 미끄러지는 빠르기 (클수록 빨리 붙음, 30이면 약 0.08초에 거의 도착)
+    [SerializeField] private float dragSlideSpeed = 30f;
     [SerializeField] private Material slotMaterial;
     [SerializeField] private Color slotColor = new Color(1f, 1f, 1f, 0.12f);
     [SerializeField] private Color slotHighlightColor = new Color(1f, 0.85f, 0.2f, 0.45f);
@@ -188,8 +189,17 @@ public class LexioClientView : MonoBehaviour
     private int slotColorId;
     private TileView pressedView;
     private Vector2 pressScreenPosition;
+    // 마우스로 잡은 패. 선택된 패를 잡으면 선택된 패 전체(dragGroup)가 함께 움직임
     private TileView draggingView;
-    private int dragOriginSlot = -1;
+    // 함께 옮기는 패와 원래 칸 (칸 번호 순서)
+    private readonly List<TileView> dragGroup = new List<TileView>();
+    private readonly List<int> dragOriginSlots = new List<int>();
+    private readonly List<TileView> dragDisplaced = new List<TileView>();
+    // 지금 놓으면 될 배치 (드래그 중 미리 보기용, handSlots와 같은 크기)
+    private TileView[] dragPreviewSlots;
+    // 잡은 패가 묶음에서 몇 번째인지
+    private int dragGrabIndex;
+    // 묶음이 들어갈 첫 칸 (여기서부터 dragGroup.Count칸)
     private int dragTargetSlot = -1;
 
     public event Action SelectionChanged;
@@ -226,6 +236,7 @@ public class LexioClientView : MonoBehaviour
             handSlotColumns = Mathf.CeilToInt(maxTiles / (float)handSlotRows);
         }
         handSlots = new TileView[handSlotColumns * handSlotRows];
+        dragPreviewSlots = new TileView[handSlots.Length];
         slotPropertyBlock = new MaterialPropertyBlock();
         slotColorId = Shader.PropertyToID("_BaseColor");
 
@@ -562,40 +573,108 @@ public class LexioClientView : MonoBehaviour
         return result;
     }
 
+    // 선택된 패를 잡으면 선택된 패 전체를, 아니면 잡은 패 한 장만 옮김
     private void BeginDrag(TileView view)
     {
         draggingView = view;
-        dragOriginSlot = FindSlot(view);
-        dragTargetSlot = dragOriginSlot;
+        dragGroup.Clear();
+        dragOriginSlots.Clear();
+        for (int slot = 0; slot < handSlots.Length; slot++)
+        {
+            TileView slotView = handSlots[slot];
+            bool isMember = slotView == view || (view.IsSelected && slotView != null && slotView.IsSelected);
+            if (isMember)
+            {
+                dragGroup.Add(slotView);
+                dragOriginSlots.Add(slot);
+            }
+        }
+        dragGrabIndex = dragGroup.IndexOf(view);
+        dragTargetSlot = GetGroupStartSlot(FindSlot(view));
+        BuildDropArrangement(dragTargetSlot);
         ShowSlotMarkers(true);
         RefreshSlotHighlight();
     }
 
-    // 마우스와 화면상 가장 가까운 칸을 놓을 칸으로 정하고, 끄는 타일은 그 줄 위에서 마우스를 가로로 따라감
+    // 잡은 패가 slot에 올 때 묶음의 첫 칸. 묶음이 줄 끝을 넘지 않도록 같은 줄 안으로 당김
+    private int GetGroupStartSlot(int slot)
+    {
+        int row = slot / handSlotColumns;
+        int column = slot % handSlotColumns - dragGrabIndex;
+        column = Mathf.Clamp(column, 0, Mathf.Max(0, handSlotColumns - dragGroup.Count));
+        return row * handSlotColumns + column;
+    }
+
+    // 마우스와 화면상 가장 가까운 칸을 놓을 칸으로 정하고, 놓았을 때의 배치를 미리 보여줌
+    // 끄는 패는 칸 단위로 붙고, 밀려날 패는 갈 자리로 미리 옮겨 가서 패끼리 겹치지 않음
     private void UpdateDrag(Vector2 screenPosition)
     {
         int slot = FindNearestSlotOnScreen(screenPosition);
-        if (slot != dragTargetSlot)
+        int startSlot = GetGroupStartSlot(slot);
+        if (startSlot != dragTargetSlot)
         {
-            dragTargetSlot = slot;
+            dragTargetSlot = startSlot;
+            BuildDropArrangement(dragTargetSlot);
             RefreshSlotHighlight();
         }
+        SlideToPreview();
+    }
 
-        // 놓을 줄의 타일 면에 마우스를 투영해서 가로 위치를 구함
-        Quaternion rotation = Quaternion.Euler(handTileEuler);
-        Vector3 rowOrigin = GetSlotPosition(slot - slot % handSlotColumns);
-        Ray ray = viewCamera.ScreenPointToRay(screenPosition);
-        Plane plane = new Plane(rotation * Vector3.forward, rowOrigin);
-        if (plane.Raycast(ray, out float enter))
+    // handSlots는 그대로 두고, 묶음을 targetSlot부터 붙여 넣은 결과를 dragPreviewSlots에 만듦
+    // 묶음이 들어갈 칸에 있던 다른 패는 묶음이 떠난 칸으로 순서대로 옮겨 감
+    // 묶음이 떠난 칸 중 비어 있는 칸은 항상 밀려난 패 수 이상이라 모두 들어감
+    private void BuildDropArrangement(int targetSlot)
+    {
+        Array.Copy(handSlots, dragPreviewSlots, handSlots.Length);
+        dragDisplaced.Clear();
+        for (int i = 0; i < dragGroup.Count; i++)
         {
-            // 마우스는 타일 중심을 잡고 있으므로 피벗 기준으로 되돌림
-            Vector3 point = ray.GetPoint(enter) - rotation * tileCenterOffset;
-            float x = Mathf.Clamp(point.x - rowOrigin.x, 0f, (handSlotColumns - 1) * GetSlotSpacing());
+            TileView other = handSlots[targetSlot + i];
+            if (other != null && dragGroup.Contains(other) == false)
+            {
+                dragDisplaced.Add(other);
+            }
+        }
 
-            // 다른 타일에 가려지지 않도록 카메라 쪽으로 띄움
-            Vector3 position = rowOrigin + new Vector3(x, 0f, 0f);
-            Vector3 toCamera = (viewCamera.transform.position - position).normalized;
-            draggingView.transform.position = position + toCamera * dragLift;
+        for (int i = 0; i < dragOriginSlots.Count; i++)
+        {
+            dragPreviewSlots[dragOriginSlots[i]] = null;
+        }
+        for (int i = 0; i < dragGroup.Count; i++)
+        {
+            dragPreviewSlots[targetSlot + i] = dragGroup[i];
+        }
+
+        int next = 0;
+        for (int i = 0; i < dragOriginSlots.Count; i++)
+        {
+            int originSlot = dragOriginSlots[i];
+            if (dragPreviewSlots[originSlot] == null && next < dragDisplaced.Count)
+            {
+                dragPreviewSlots[originSlot] = dragDisplaced[next];
+                next++;
+            }
+        }
+        dragDisplaced.Clear();
+    }
+
+    // 미리 보기 배치 위치로 매 프레임 조금씩 다가가서 부드럽게 미끄러짐
+    // 끄는 패는 선택돼 있어도 올리지 않음 (놓으면 LayoutHand가 선택 높이로 되돌림)
+    private void SlideToPreview()
+    {
+        float t = 1f - Mathf.Exp(-dragSlideSpeed * Time.deltaTime);
+        for (int slot = 0; slot < dragPreviewSlots.Length; slot++)
+        {
+            TileView view = dragPreviewSlots[slot];
+            if (view != null)
+            {
+                Vector3 goal = GetSlotPosition(slot);
+                if (view.IsSelected && dragGroup.Contains(view) == false)
+                {
+                    goal += Vector3.up * selectedLift;
+                }
+                view.transform.position = Vector3.Lerp(view.transform.position, goal, t);
+            }
         }
     }
 
@@ -618,18 +697,17 @@ public class LexioClientView : MonoBehaviour
         return result;
     }
 
-    // 놓은 칸에 다른 패가 있으면 서로 자리를 바꾸고, 빈칸이면 원래 칸이 빈칸이 됨
+    // 미리 보여준 배치를 그대로 확정. 묶음은 놓은 칸부터 붙여서 들어감
+    // 한 장이면 기존과 같음: 다른 패가 있으면 서로 자리를 바꾸고, 빈칸이면 원래 칸이 빈칸이 됨
+    // 선택 상태는 그대로 유지 (옮긴 뒤 바로 제출 가능)
     private void EndDrag()
     {
-        if (dragOriginSlot >= 0 && dragTargetSlot >= 0 && dragTargetSlot != dragOriginSlot)
+        if (dragTargetSlot >= 0 && dragGroup.Count > 0)
         {
-            TileView other = handSlots[dragTargetSlot];
-            handSlots[dragTargetSlot] = draggingView;
-            handSlots[dragOriginSlot] = other;
+            BuildDropArrangement(dragTargetSlot);
+            Array.Copy(dragPreviewSlots, handSlots, handSlots.Length);
         }
-        draggingView = null;
-        dragOriginSlot = -1;
-        dragTargetSlot = -1;
+        ClearDragState();
         ShowSlotMarkers(false);
         LayoutHand();
     }
@@ -637,11 +715,18 @@ public class LexioClientView : MonoBehaviour
     // 드래그 중 손패가 바뀌거나 접속이 끊긴 경우. 위치는 호출 측의 LayoutHand가 되돌림
     private void CancelDrag()
     {
-        draggingView = null;
         pressedView = null;
-        dragOriginSlot = -1;
-        dragTargetSlot = -1;
+        ClearDragState();
         ShowSlotMarkers(false);
+    }
+
+    private void ClearDragState()
+    {
+        draggingView = null;
+        dragGroup.Clear();
+        dragOriginSlots.Clear();
+        dragGrabIndex = 0;
+        dragTargetSlot = -1;
     }
 
     private void ShowSlotMarkers(bool isVisible)
@@ -702,7 +787,8 @@ public class LexioClientView : MonoBehaviour
         {
             for (int slot = 0; slot < slotMarkers.Length; slot++)
             {
-                if (slot == dragTargetSlot)
+                bool isTarget = dragTargetSlot >= 0 && slot >= dragTargetSlot && slot < dragTargetSlot + dragGroup.Count;
+                if (isTarget)
                 {
                     slotPropertyBlock.SetColor(slotColorId, slotHighlightColor);
                 }
@@ -848,7 +934,7 @@ public class LexioClientView : MonoBehaviour
             // 가운데 패가 먼저 온 경우: 아직 손패에 있는 타일을 숨기고 그 자리에서 출발 (손패에서는 곧 RPC로 빠짐)
             flight.startPosition = handView.transform.position;
             flight.startRotation = handView.transform.rotation;
-            if (handView == draggingView || handView == pressedView)
+            if (dragGroup.Contains(handView) || handView == pressedView)
             {
                 CancelDrag();
                 LayoutHand();

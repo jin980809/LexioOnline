@@ -27,7 +27,7 @@ public class LexioUI : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private LexioTableNetworkManager networkManager;
-    [SerializeField] private LexioClientView clientView;
+    [SerializeField] private LexioTableView clientView;
     // 정산 중 칩 숫자를 칩이 오가는 대로 1씩 바꿔 보여주기 위해 사용
     [SerializeField] private ChipFlightView chipView;
 
@@ -46,6 +46,8 @@ public class LexioUI : MonoBehaviour
     [SerializeField] private GameObject gamePanel;
     [SerializeField] private Button submitButton;
     [SerializeField] private Button passButton;
+    // 선택한 패를 모두 해제 (항상 누를 수 있음)
+    [SerializeField] private Button clearSelectionButton;
     [SerializeField] private Button sortSuitButton;
     [SerializeField] private Button sortNumberButton;
     // 패 정리 시간에만 보임. 사람 전원이 누르면 정리 시간이 바로 끝남
@@ -71,6 +73,8 @@ public class LexioUI : MonoBehaviour
     [SerializeField] private Color turnLabelColor = new Color(1f, 0.85f, 0.2f, 1f);
     // 선택한 조합을 지금 바로 낼 수 있을 때 족보 이름 색
     [SerializeField] private Color playableSelectionColor = new Color(1f, 0.85f, 0.2f, 1f);
+    // 최종 결과에서 내 줄 글자색
+    [SerializeField] private Color myResultColor = new Color(1f, 0.85f, 0.2f, 1f);
     // 제출/패스를 지금 할 수 없을 때 버튼 투명도 (누르는 건 가능)
     [SerializeField] private float unavailableButtonAlpha = 0.5f;
 
@@ -86,6 +90,7 @@ public class LexioUI : MonoBehaviour
     private int[] settleChanges = new int[0];
     private bool isSettling;
     private Combination lastPlayCombination;
+    private readonly CombinationText combinationText = new CombinationText();
     private CanvasGroup submitGroup;
     private CanvasGroup passGroup;
     private Color defaultSelectionColor;
@@ -121,6 +126,11 @@ public class LexioUI : MonoBehaviour
         startButton.onClick.AddListener(OnStartClicked);
         submitButton.onClick.AddListener(OnSubmitClicked);
         passButton.onClick.AddListener(OnPassClicked);
+        // Setup을 다시 돌리기 전 씬(팀원 씬 포함)에는 이 버튼이 없을 수 있음
+        if (clearSelectionButton != null)
+        {
+            clearSelectionButton.onClick.AddListener(OnClearSelectionClicked);
+        }
         sortSuitButton.onClick.AddListener(OnSortSuitClicked);
         sortNumberButton.onClick.AddListener(OnSortNumberClicked);
         readyButton.onClick.AddListener(OnReadyClicked);
@@ -229,7 +239,7 @@ public class LexioUI : MonoBehaviour
 
         if (showResult)
         {
-            RefreshResult(table);
+            RefreshResult(table, mySeat);
         }
     }
 
@@ -372,7 +382,8 @@ public class LexioUI : MonoBehaviour
 
         if (lastPlayCombination != null && table.LastPlaySeat >= 0)
         {
-            lastPlayText.text = GetNickname(table, table.LastPlaySeat) + " : " + lastPlayCombination.DisplayName;
+            // 족보 문양 숫자 (예: 스트레이트 해 1). 말풍선과 같은 형식
+            lastPlayText.text = GetNickname(table, table.LastPlaySeat) + " : " + combinationText.GetPlayText(lastPlayCombination, table.MaxNumber);
         }
         else
         {
@@ -755,6 +766,11 @@ public class LexioUI : MonoBehaviour
         }
     }
 
+    private void OnClearSelectionClicked()
+    {
+        clientView.ClearSelection();
+    }
+
     private void OnSortSuitClicked()
     {
         clientView.SortHand(HandSortMode.SuitFirst);
@@ -772,7 +788,8 @@ public class LexioUI : MonoBehaviour
 
     // ---------------- 최종 결과 ----------------
 
-    private void RefreshResult(LexioTable table)
+    // 내 줄은 노란색으로 표시
+    private void RefreshResult(LexioTable table, int mySeat)
     {
         int count = table.Seats.Count;
         if (resultChips.Length != count)
@@ -805,12 +822,22 @@ public class LexioUI : MonoBehaviour
         for (int i = 0; i < resultOrder.Count; i++)
         {
             int seat = resultOrder[i];
+            bool isMine = seat == mySeat;
+            if (isMine)
+            {
+                builder.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(myResultColor)).Append('>');
+            }
             builder.Append(resultRanks[seat]).Append("위   ").Append(table.Seats[seat].nickname);
             if (table.Seats[seat].isAi)
             {
                 builder.Append(" (AI)");
             }
-            builder.Append("   칩 ").Append(resultChips[seat]).Append('\n');
+            builder.Append("   칩 ").Append(resultChips[seat]);
+            if (isMine)
+            {
+                builder.Append("</color>");
+            }
+            builder.Append('\n');
         }
         resultText.text = builder.ToString();
     }
