@@ -47,18 +47,6 @@ public class LoginNetworkBehaviour : NetworkBehaviour
         // 실제 DB 접근은 서버에서만 실행
         bool success = serverDBManager.Login(_id, _pw, out userInfo);
 
-        //if (success)
-        //{
-        //    isLoggedIn = true;
-        //
-        //    // 로그인 결과를 클라이언트에 반환
-        //    TargetAuthResult(connectionToClient, true, "로그인 성공");
-        //}
-        //else
-        //{
-        //    TargetAuthResult(connectionToClient, false, "아이디 또는 비밀번호가 올바르지 않습니다.");
-        //}
-
         if (!success || userInfo == null)
         {
             TargetAuthResult(connectionToClient, false,"아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -69,25 +57,23 @@ public class LoginNetworkBehaviour : NetworkBehaviour
         loggedInUser = userInfo;
 
         TargetAuthResult(connectionToClient, true, "로그인 성공");
-
-
     }
 
-    // 클라이언트 -> 서버 회원가입 요청
-    //[Command]
-    //public void CmdRegister(string username, string password)
-    //{
-    //    if (string.IsNullOrWhiteSpace(username) ||string.IsNullOrEmpty(password) ||username.Length > 32 ||password.Length > 128)
-    //    {
-    //        TargetAuthResult(connectionToClient,false,"입력값을 확인해 주세요.");
-    //        return;
-    //    }
-    //
-    //    // 회원가입 메서드는 기존 DB 클래스에 구현해야 합니다.
-    //    bool success = serverDatabase.Register(username, password);
-    //
-    //    TargetAuthResult(connectionToClient,success,success ? "회원가입 성공" : "회원가입 실패");
-    //}
+    //클라이언트 -> 서버 회원가입 요청
+    [Command]
+    public void CmdRegister(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) ||string.IsNullOrEmpty(password) ||username.Length > 32 ||password.Length > 128)
+        {
+            TargetAuthResult(connectionToClient,false,"입력값을 확인해 주세요.");
+            return;
+        }
+    
+        // 회원가입 메서드는 기존 DB 클래스에 구현해야 합니다.
+        bool success = serverDatabase.Register(username, password);
+    
+        TargetAuthResult(connectionToClient,success,success ? "회원가입 성공" : "회원가입 실패");
+    }
 
     // 서버 -> 요청한 클라이언트 결과 반환
     [TargetRpc]
@@ -98,12 +84,6 @@ public class LoginNetworkBehaviour : NetworkBehaviour
         Debug.Log(message);
     }
 
-    // 서버 측 게임 기능에서 로그인 여부를 확인할 때 사용
-    //[Server]
-    //public bool IsLoggedIn()
-    //{
-    //    return isLoggedIn;
-    //}
     [Server]
     public bool IsLoggedIn()
     {

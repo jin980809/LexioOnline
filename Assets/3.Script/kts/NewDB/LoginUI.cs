@@ -5,11 +5,16 @@ using Mirror;
 public class LoginUI : MonoBehaviour
 {
     [Header("입력창")]
-    [SerializeField] private InputField usernameInput;
-    [SerializeField] private InputField passwordInput;
+    [SerializeField] private InputField loginUserID;
+    [SerializeField] private InputField loginUserPwd;
+
+    [SerializeField] private InputField registerUserName;
+    [SerializeField] private InputField registerUserID;
+    [SerializeField] private InputField registerUserPwd;
 
     [Header("결과 표시")]
-    [SerializeField] private Text resultText;
+    [SerializeField] private Text loginResultText;
+    [SerializeField] private Text registerResultText;
 
     private LoginNetworkBehaviour loginBehaviour;
 
@@ -30,14 +35,14 @@ public class LoginUI : MonoBehaviour
     {
         if (!NetworkClient.isConnected)
         {
-            resultText.text = "서버에 연결되지 않았습니다.";
+            Debug.Log("서버에 연결되지 않았습니다.");
             return false;
         }
 
         // 내 플레이어 오브젝트를 가져옵니다.
         if (NetworkClient.localPlayer == null)
         {
-            resultText.text = "플레이어 생성 중입니다.";
+            Debug.Log("플레이어 오브젝트 생성되지 않았습니다.");
             return false;
         }
 
@@ -45,18 +50,18 @@ public class LoginUI : MonoBehaviour
 
         if (loginBehaviour == null)
         {
-            resultText.text = "LoginNetworkBehaviour를 찾을 수 없습니다.";
+            Debug.Log("LoginNetworkBehaviour를 찾을 수 없습니다.");
             return false;
         }
 
-        string username = usernameInput.text.Trim();
-        string password = passwordInput.text;
-
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
-        {
-            resultText.text = "아이디와 비밀번호를 입력해 주세요.";
-            return false;
-        }
+        //string username = userID.text;
+        //string password = userPwd.text;
+        //
+        //if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
+        //{
+        //    resultText.text = "아이디와 비밀번호를 입력해 주세요.";
+        //    return false;
+        //}
 
         // 결과 이벤트가 중복 등록되지 않도록 합니다.
         loginBehaviour.OnAuthResult -= HandleAuthResult;
@@ -70,26 +75,26 @@ public class LoginUI : MonoBehaviour
     {
         if (!PrepareRequest()) return;
 
-        resultText.text = "로그인 확인 중...";
+        loginResultText.text = "로그인 확인 중...";
 
-        loginBehaviour.CmdLogin(usernameInput.text.Trim(),passwordInput.text);
+        loginBehaviour.CmdLogin(loginUserID.text.Trim(), loginUserID.text);
     }
 
     // 회원가입 요청
-    //private void SendRegisterRequest()
-    //{
-    //    if (!PrepareRequest())
-    //        return;
-    //
-    //    resultText.text = "회원가입 처리 중...";
-    //
-    //    loginBehaviour.CmdRegister(usernameInput.text.Trim(),passwordInput.text);
-    //}
+    private void SendRegisterRequest()
+    {
+        if (!PrepareRequest())
+            return;
+
+        registerResultText.text = "회원가입 처리 중...";
+    
+        loginBehaviour.CmdRegister(registerUserName.text.Trim(), registerUserName.text);
+    }
 
     // 서버에서 결과를 반환하면 실행
     private void HandleAuthResult(bool success, string message)
     {
-        resultText.text = message;
+        registerResultText.text = message;
 
         if (success)
         {
