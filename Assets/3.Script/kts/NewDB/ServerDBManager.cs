@@ -11,8 +11,6 @@ public class ServerDBManager : MonoBehaviour
 {
     [SerializeField] private string DB_Path = string.Empty;
 
-    //public UserInfo info { get; private set; }
-
     private MySqlConnection con;
     private MySqlDataReader reader;
 
@@ -34,16 +32,8 @@ public class ServerDBManager : MonoBehaviour
     MySqlCommand command;
 
     public bool duplicationID { get; private set; } = false;
-    public bool selectImage { get; private set; } = false;
-    public void SelectImageON(int num)
-    {
-        selectImage = true;
-        imageNum = num;
-    }
-    public void SelectImageOFF()
-    {
-        selectImage = false;
-    }
+    public bool duplicationName { get; private set; } = false;
+    
 
     private void Start()
     {
@@ -183,24 +173,18 @@ public class ServerDBManager : MonoBehaviour
             return false;
         }
     }
-    /*
+    
     //회원가입
-    public bool SignUp(string _id, string _pw, string _name)
+    public bool SignUp(string _id, string _pw, string _name, int _imageNum)
     {
         try
         {
-
             if (!Connection_Check(con))
             {
                 return false;
             }
-
-            if (!selectImage)
-            {
-                return false;
-            }
-
             duplicationID = false;
+            duplicationName = false;
 
             sqlCommand = string.Format(@"SELECT userID FROM userinfo WHERE UserID='{0}';", _id);
             command = new MySqlCommand(sqlCommand, con);
@@ -220,19 +204,19 @@ public class ServerDBManager : MonoBehaviour
             if (reader.HasRows)
             {
                 if (!reader.IsClosed) reader.Close();
+                duplicationName = true;
                 return false;
             }
             else
             {
                 if (!reader.IsClosed) reader.Close();
 
-                sqlCommand = string.Format(@"INSERT INTO userinfo (userID, userPW, userName, imageNum) VALUES('{0}', '{1}', '{2}', '{3}');", _id, _pw, _name, imageNum);
+                sqlCommand = string.Format(@"INSERT INTO userinfo (userID, userPW, userName, imageNum) VALUES('{0}', '{1}', '{2}', '{3}');", _id, _pw, _name, _imageNum);
 
                 command = new MySqlCommand(sqlCommand, con);
                 reader = command.ExecuteReader();
 
                 if (!reader.IsClosed) reader.Close();
-                SelectImageOFF();
                 return true;
             }
         }
@@ -240,11 +224,10 @@ public class ServerDBManager : MonoBehaviour
         {
             Debug.Log(e.Message);
             if (!reader.IsClosed) reader.Close();
-            SelectImageOFF();
             return false;
         }
     }
-
+    
     //비밀번호 변경
     public bool NewPassword(string _id, string _pw, string _newPw)
     {
@@ -356,6 +339,105 @@ public class ServerDBManager : MonoBehaviour
         }
     }
 
+    //닉네임 변경
+    public bool NewName(string _id, string _newName, out UserInfo userinfo)
+    {
+        try
+        {
+
+            if (!Connection_Check(con))
+            {
+                userinfo = null;
+                return false;
+            }
+
+            sqlCommand = string.Format(@"SELECT userID,userPW,userName FROM userinfo WHERE userID='{0}';", _id);
+
+            command = new MySqlCommand(sqlCommand, con);
+
+            reader = command.ExecuteReader();
+            if (reader.HasRows)
+            {
+                while (reader.Read())
+                {
+
+                    id = (reader.IsDBNull(reader.GetOrdinal("userID"))) ? string.Empty : reader["userID"].ToString();
+                    pw = (reader.IsDBNull(reader.GetOrdinal("userPW"))) ? string.Empty : reader["userPW"].ToString();
+                    name = (reader.IsDBNull(reader.GetOrdinal("userName"))) ? string.Empty : reader["userName"].ToString();
+
+                    if (!name.Equals(string.Empty) || !id.Equals(string.Empty) || !pw.Equals(string.Empty))
+                    {
+
+                        if (!reader.IsClosed) reader.Close();
+
+                        sqlCommand = string.Format(@"UPDATE userinfo SET userName='{0}' WHERE userID='{1}';", _newName, _id);
+                        command = new MySqlCommand(sqlCommand, con);
+                        reader = command.ExecuteReader();
+
+                        if (!reader.IsClosed) reader.Close();
+
+                        sqlCommand = string.Format(@"SELECT userID,userPW,userName,imageNum,first,second,third,fourth,playNum,averageRank FROM userinfo WHERE userID='{0}';", _id);
+
+                        command = new MySqlCommand(sqlCommand, con);
+
+                        reader = command.ExecuteReader();
+                        if (reader.HasRows) //reader의 행 유무
+                        {
+                            while (reader.Read())
+                            {
+                                id = (reader.IsDBNull(reader.GetOrdinal("userID"))) ? string.Empty : reader["userID"].ToString();
+                                pw = (reader.IsDBNull(reader.GetOrdinal("userPW"))) ? string.Empty : reader["userPW"].ToString();
+                                name = (reader.IsDBNull(reader.GetOrdinal("userName"))) ? string.Empty : reader["userName"].ToString();
+                                imageNum = reader.GetInt32(reader.GetOrdinal("imageNum"));
+                                first = reader.GetFloat(reader.GetOrdinal("first"));
+                                second = reader.GetFloat(reader.GetOrdinal("second"));
+                                third = reader.GetFloat(reader.GetOrdinal("third"));
+                                fourth = reader.GetFloat(reader.GetOrdinal("fourth"));
+                                playNum = reader.GetFloat(reader.GetOrdinal("playNum"));
+                                averageRank = reader.GetFloat(reader.GetOrdinal("averageRank"));
+
+                                if (!id.Equals(string.Empty) || !pw.Equals(string.Empty) || !name.Equals(string.Empty))
+                                {
+                                    userinfo = new UserInfo(id, pw, name, imageNum, first, second, third, fourth, playNum, averageRank);
+                                    if (!reader.IsClosed) reader.Close();
+                                    return true;
+
+                                }
+                                else
+                                {
+                                    if (!reader.IsClosed) reader.Close();
+                                    userinfo = null;
+                                    return false;
+                                }
+                            }
+                        }
+                        userinfo = null;
+                        return false;
+                    }
+                    else
+                    {
+                        if (!reader.IsClosed) reader.Close();
+                        userinfo = null;
+                        return false;
+
+                    }
+                }
+            }
+            if (!reader.IsClosed) reader.Close();
+            userinfo = null;
+            return false;
+        }
+        catch (Exception e)
+        {
+            Debug.Log(e.Message);
+            if (!reader.IsClosed) reader.Close();
+            userinfo = null;
+            return false;
+        }
+    }
+
+
+    /*
     //등수 변경
     public void First_UP()
     {
