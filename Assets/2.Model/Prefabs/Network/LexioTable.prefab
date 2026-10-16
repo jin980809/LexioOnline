@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2878431153132084579}
   - component: {fileID: 4238994164180675811}
   - component: {fileID: 493788688936497039}
+  - component: {fileID: 5017750821211329694}
   m_Layer: 0
   m_Name: LexioTable
   m_TagString: Untagged
@@ -67,7 +68,24 @@ MonoBehaviour:
   syncInterval: 0
   turnSeconds: 30
   aiDelaySeconds: 1
-  roundEndDelaySeconds: 5
+  roundEndDelaySeconds: 10
   dealSeconds: 2
   prepareSeconds: 60
   roundCount: 5
+  startingChips: 50
+--- !u!114 &5017750821211329694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8266939966723020079}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d17e718851449a6879986e45c458fb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Mirror.Components::Mirror.NetworkMatch
+  syncDirection: 0
+  syncMode: 0
+  syncInterval: 0
+  MatchID: 

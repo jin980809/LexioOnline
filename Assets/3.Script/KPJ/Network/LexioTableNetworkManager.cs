@@ -23,6 +23,11 @@ public class LexioTableNetworkManager : NetworkManager
     // 자리/인원은 SyncVar보다 RPC가 먼저 도착할 수 있어서 손패와 함께 받음
     public event Action<byte[], bool, int, int> HandReceived;
     public event Action<string> NoticeReceived;
+    // 누군가 패를 냄 (자리, 낸 타일 ID) / 패스함 (자리). 말풍선 표시용
+    public event Action<int, byte[]> PlayReceived;
+    public event Action<int> PassReceived;
+    // 라운드 끝 모든 자리의 남은 패 (자리 순서로 이어 붙인 타일 ID, 자리별 장수)
+    public event Action<byte[], int[]> HandsRevealed;
     public event Action ClientDisconnected;
 
     public override void Start()
@@ -75,6 +80,30 @@ public class LexioTableNetworkManager : NetworkManager
         if (NoticeReceived != null)
         {
             NoticeReceived(message);
+        }
+    }
+
+    public void RaisePlayReceived(int seat, byte[] tileIds)
+    {
+        if (PlayReceived != null)
+        {
+            PlayReceived(seat, tileIds);
+        }
+    }
+
+    public void RaisePassReceived(int seat)
+    {
+        if (PassReceived != null)
+        {
+            PassReceived(seat);
+        }
+    }
+
+    public void RaiseHandsRevealed(byte[] tileIds, int[] counts)
+    {
+        if (HandsRevealed != null)
+        {
+            HandsRevealed(tileIds, counts);
         }
     }
 
