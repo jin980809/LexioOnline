@@ -14,6 +14,8 @@ public class UserInfo
     public float fourth { get; private set; } //4µî È½¼ö
     public float playNum { get; private set; } //ÆÇ¼ö
     public float averageRank { get; private set; } //Æò±Õ µî¼ö
+
+    public UserInfo() { }
     public UserInfo(string _id, string _pwd, string _name, int _imageNum, float _first, float _second, float _third, float _fourth, float _playNum, float _averageRank)
     {
         userID = _id;
