@@ -14,7 +14,7 @@ public class DealAnimator : MonoBehaviour
     [SerializeField] private float dealSeconds = 1.8f;
     [SerializeField] private float dealFlightSeconds = 0.35f;
     [SerializeField] private float dealArcHeight = 1.2f;
-    [SerializeField] private Vector3 dealOrigin = new Vector3(0f, 0.6f, 0f);
+    [SerializeField] private Vector3 dealOrigin = new Vector3(0f, 0.6f, -0.5f);
 
     // 중앙에서 자리로 날아가는 타일 1장
     private struct DealFlight

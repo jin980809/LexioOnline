@@ -28,6 +28,7 @@ public class LexioPlayer : NetworkBehaviour
         {
             manager.RegisterLocalPlayer(this);
             CmdSetNickname(manager.PendingNickname);
+            CmdSetProfileImage(manager.PendingProfileImage);
         }
     }
 
@@ -46,6 +47,15 @@ public class LexioPlayer : NetworkBehaviour
         if (Table != null)
         {
             Table.ServerSetNickname(this, nickname);
+        }
+    }
+
+    [Command]
+    private void CmdSetProfileImage(int profileImage)
+    {
+        if (Table != null)
+        {
+            Table.ServerSetProfileImage(this, profileImage);
         }
     }
 

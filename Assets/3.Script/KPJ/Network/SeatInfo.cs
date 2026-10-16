@@ -19,10 +19,12 @@ public struct SeatInfo : IEquatable<SeatInfo>
     public bool isReady;
     // 라운드 정산 기준 장수 (2를 든 만큼 늘어난 남은 장수). 정산 연출에서 누가 누구에게 주는지 계산용, 라운드 중에는 0
     public int settleCount;
+    // 프로필 이미지 번호 (유저 DB의 imageNum). 클라이언트 LexioUI.profileSprites의 인덱스로 씀
+    public int profileImage;
 
     public bool Equals(SeatInfo other)
     {
-        return nickname == other.nickname && chips == other.chips && tileCount == other.tileCount && isAi == other.isAi && isReady == other.isReady && settleCount == other.settleCount;
+        return nickname == other.nickname && chips == other.chips && tileCount == other.tileCount && isAi == other.isAi && isReady == other.isReady && settleCount == other.settleCount && profileImage == other.profileImage;
     }
 
     public override bool Equals(object obj)
@@ -37,6 +39,6 @@ public struct SeatInfo : IEquatable<SeatInfo>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(nickname, chips, tileCount, isAi, isReady, settleCount);
+        return HashCode.Combine(nickname, chips, tileCount, isAi, isReady, settleCount, profileImage);
     }
 }

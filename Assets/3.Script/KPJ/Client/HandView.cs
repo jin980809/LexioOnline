@@ -15,7 +15,7 @@ public class HandView : MonoBehaviour
     [SerializeField] private CenterPlayView centerPlayView;
 
     [Header("Hand (내 패)")]
-    [SerializeField] private Vector3 handCenter = new Vector3(0f, 0.55f, -6f);
+    [SerializeField] private Vector3 handCenter = new Vector3(1.3f, 0.55f, -6.3f);
     [SerializeField] private Vector3 handTileEuler = new Vector3(20f, 0f, 0f);
 
     [Header("Hand Slots (손패 칸 / 드래그 배치)")]
@@ -31,8 +31,8 @@ public class HandView : MonoBehaviour
     // 드래그 중 패가 칸 사이를 미끄러지는 빠르기 (클수록 빨리 붙음, 30이면 약 0.08초에 거의 도착)
     [SerializeField] private float dragSlideSpeed = 30f;
     [SerializeField] private Material slotMaterial;
-    [SerializeField] private Color slotColor = new Color(1f, 1f, 1f, 0.12f);
-    [SerializeField] private Color slotHighlightColor = new Color(1f, 0.85f, 0.2f, 0.45f);
+    [SerializeField] private Color slotColor = new Color(1f, 0.97f, 0.88f, 0.22f);
+    [SerializeField] private Color slotHighlightColor = new Color(1f, 0.85f, 0.4f, 0.75f);
 
     private readonly List<TileView> handViews = new List<TileView>();
     private readonly Dictionary<byte, TileView> handPool = new Dictionary<byte, TileView>();

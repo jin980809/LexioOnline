@@ -8,18 +8,17 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Sun8
-  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
+  m_Shader: {fileID: 4800000, guid: 1fad7422ca0e89349ace2dc903926a6b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
+  m_ValidKeywords: []
+  m_InvalidKeywords:
   - _NORMALMAP
-  m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap:
-    RenderType: Opaque
+  stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -102,17 +101,26 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _MaskMax: 0.35
+    - _MaskMin: 0.08
     - _Metallic: 0.5
     - _Mode: 0
     - _OcclusionStrength: 1
+    - _OutlineWidth: 0.02
     - _Parallax: 0.02
+    - _PatternBoost: 1.1
+    - _PatternUnlit: 0.8
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _Smooth: 0.01
     - _Smoothness: 0.6
     - _SmoothnessTextureChannel: 0
+    - _SpecSize: 0.96
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
+    - _Step1: 0
+    - _Step2: 0.45
     - _Surface: 0
     - _UVSec: 0
     - _WorkflowMode: 1
@@ -120,8 +128,12 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BodyColor: {r: 0.15999997, g: 0.15999997, b: 0.19999996, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _MidColor: {r: 0.72, g: 0.71, b: 0.8, a: 1}
+    - _OutlineColor: {r: 0.14099997, g: 0.08599999, b: 0.21999997, a: 1}
+    - _ShadowColor: {r: 0.45, g: 0.42999998, b: 0.54999995, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

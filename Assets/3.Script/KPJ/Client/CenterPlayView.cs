@@ -12,7 +12,7 @@ public class CenterPlayView : MonoBehaviour
     [SerializeField] private OpponentView opponentView;
 
     [Header("Center (마지막 낸 패)")]
-    [SerializeField] private Vector3 centerPosition = new Vector3(0f, 0.25f, 0f);
+    [SerializeField] private Vector3 centerPosition = new Vector3(0f, 0.25f, -0.5f);
     [SerializeField] private Vector3 centerTileEuler = new Vector3(90f, 0f, 0f);
 
     [Header("Play (낸 패가 가운데로 날아가기)")]

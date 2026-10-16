@@ -14,7 +14,7 @@ public class OpponentView : MonoBehaviour
     [Header("Opponents (상대)")]
     [SerializeField] private float opponentRadiusX = 5f;
     [SerializeField] private float opponentRadiusZ = 3.6f;
-    [SerializeField] private float opponentOffsetZ = 1.2f;
+    [SerializeField] private float opponentOffsetZ = -1f;
     // 5인(상대 4명)일 때 자리끼리 줄 끝이 붙지 않도록 배치 타원을 키우는 배율
     [SerializeField] private float fivePlayerRadiusScale = 1.3f;
     [SerializeField] private float opponentTileHeight = 0.55f;
@@ -27,7 +27,7 @@ public class OpponentView : MonoBehaviour
     [SerializeField] private Vector3 backTileEuler = Vector3.zero;
     [SerializeField] private float labelHeight = 1.4f;
     // 상대 정보(이름표)를 패 줄보다 바깥쪽(테이블 가장자리 쪽)으로 물리는 거리. 뒷줄과 공개 패 뒷줄까지 피하도록 잡음
-    [SerializeField] private float labelBackDistance = 3f;
+    [SerializeField] private float labelBackDistance = 3.8f;
 
     [Header("Chips (정산 칩이 출발/도착하는 자리)")]
     // 손패/상대 패 줄에서 테이블 가운데 쪽으로 떨어진 거리

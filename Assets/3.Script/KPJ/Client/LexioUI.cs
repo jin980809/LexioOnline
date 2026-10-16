@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Mirror;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 // 접속 → 대기실 → 게임 → 최종 순위 화면 전환과 버튼 처리
@@ -53,24 +54,79 @@ public class LexioUI : MonoBehaviour
     // 패 정리 시간에만 보임. 사람 전원이 누르면 정리 시간이 바로 끝남
     [SerializeField] private Button readyButton;
     [SerializeField] private Text timerText;
+    // 남은 시간 비율 (1 = 방금 시작, 0 = 마감). 씬에 없으면 건너뜀
+    [SerializeField] private Slider timerSlider;
+    // 내 차례에 남은 시간이 이 초 이하면 경고: 게이지 이미지를 timerWarningSprite로 바꾸고 타이머 전체(timerRoot)를 좌우로 흔듦
+    [SerializeField] private int timerWarningSeconds = 5;
+    // 비워 두면 게이지 이미지는 바꾸지 않음
+    [SerializeField] private Sprite timerWarningSprite;
+    // 흔들 타이머 오브젝트 (게이지 + 숫자의 부모). 비워 두면 흔들지 않음
+    [SerializeField] private RectTransform timerRoot;
+    // 흔들리는 최대 각도(도)와 빠르기 (클수록 빠름)
+    [SerializeField] private float timerShakeAngle = 8f;
+    [SerializeField] private float timerShakeSpeed = 25f;
     [SerializeField] private Text roundText;
     [SerializeField] private Text turnText;
-    [SerializeField] private Text myInfoText;
+    // 패 정리 시간에만 켜지는 준비 인원 패널 ("준비 2 / 4"). 씬에 없으면 건너뜀
+    [SerializeField] private GameObject readyPanel;
+    [SerializeField] private Text readyCountText;
     [SerializeField] private Text selectionText;
     [SerializeField] private Text lastPlayText;
+
+    [Header("My Info (내 정보, 씬에 없는 칸은 건너뜀)")]
+    [FormerlySerializedAs("myInfoText")]
+    [SerializeField] private Text myNameText;
+    [SerializeField] private Text myChipText;
+    [SerializeField] private Text myTileText;
+    [SerializeField] private Image myProfileImage;
+    // 패 정리 시간에 내가 준비 완료하면 켜짐 (상대 이름표의 ReadyIcon과 같음)
+    [SerializeField] private GameObject myReadyIcon;
+    // 내 정보 배경. 내 차례 동안 myTurnColor로 물들고 원래 색 쪽으로 옅어졌다 돌아오기를 반복
+    [SerializeField] private Image myInfoPanel;
+    [SerializeField] private Color myTurnColor = new Color(1f, 0.85f, 0.4f, 1f);
+    // 깜빡이는 빠르기 (클수록 빠름)
+    [SerializeField] private float myTurnPulseSpeed = 4f;
+
+    [Header("Seat Labels (상대 이름표, 자리 번호 순서)")]
     [SerializeField] private RectTransform[] seatLabels;
-    [SerializeField] private Text[] seatLabelTexts;
+    [FormerlySerializedAs("seatLabelTexts")]
+    [SerializeField] private Text[] seatNameTexts;
+    // 아래 배열은 비워 두거나 칸이 None이면 그 칸을 건너뜀
+    [SerializeField] private Text[] seatChipTexts;
+    [SerializeField] private Text[] seatTileTexts;
+    [SerializeField] private Image[] seatProfileImages;
+    // 패 정리 시간에 준비 완료한 상대만 켜짐
+    [SerializeField] private GameObject[] seatReadyIcons;
+    // 이름표 배경(seatLabels의 Image). 차례인 사람만 turnLabelSprite로 바뀜. 둘 다 비어 있으면 바꾸지 않음
+    [SerializeField] private Sprite normalLabelSprite;
+    [SerializeField] private Sprite turnLabelSprite;
+    // 이름표가 가리면 안 되는 UI (차례 배너, 준비 인원 패널). 겹치면 이름표를 그 바로 아래(배너와 상대 패 사이)로 내림
+    // 꺼져 있어도 피함 (준비 패널이 켜지고 꺼질 때 이름표가 들썩이지 않도록)
+    [SerializeField] private RectTransform[] labelAvoidRects;
+    // 이름표 위에 뜨는 말풍선 자리 (캔버스 단위). 겹침 판정 때 이름표 위로 이만큼 더 있다고 봄
+    [SerializeField] private float labelBubbleReserve = 100f;
+    // 비켜 놓을 때 띄우는 간격 (캔버스 단위)
+    [SerializeField] private float labelAvoidGap = 16f;
+
+    [Header("Profile")]
+    // 인덱스 = 유저 DB의 imageNum (SeatInfo.profileImage). 범위를 넘으면 0번 사용
+    [SerializeField] private Sprite[] profileSprites;
+
+    [Header("Settle (정산 계산식은 말풍선에 표시)")]
+    [SerializeField] private ActionBubbleView bubbleView;
+    [SerializeField] private Color chipGainColor = new Color(0.2f, 0.6f, 0.25f, 1f);
+    [SerializeField] private Color chipLossColor = new Color(0.85f, 0.25f, 0.2f, 1f);
 
     [Header("Result")]
     [SerializeField] private GameObject resultPanel;
+    // 순위 줄을 그리는 결과 창. 비어 있으면 resultText에 글자로만 표시
+    [SerializeField] private ResultPanelView resultView;
     [SerializeField] private Text resultText;
     [SerializeField] private Button exitButton;
 
     [Header("Common")]
     [SerializeField] private Text noticeText;
     [SerializeField] private float noticeSeconds = 3f;
-    [SerializeField] private Color normalLabelColor = Color.white;
-    [SerializeField] private Color turnLabelColor = new Color(1f, 0.85f, 0.2f, 1f);
     // 선택한 조합을 지금 바로 낼 수 있을 때 족보 이름 색
     [SerializeField] private Color playableSelectionColor = new Color(1f, 0.85f, 0.2f, 1f);
     // 최종 결과에서 내 줄 글자색
@@ -104,6 +160,18 @@ public class LexioUI : MonoBehaviour
     private int cachedSeat = -1;
     private int cachedChipVersion = -1;
     private int shownSeconds = -1;
+    // 내 차례 알림용: 원래 색/이미지 (Start에서 씬 값을 보관)
+    private Color myInfoDefaultColor = Color.white;
+    private Image timerFillImage;
+    private Sprite timerDefaultSprite;
+    private Quaternion timerDefaultRotation = Quaternion.identity;
+    private bool isTimerWarning;
+    // 타이머 슬라이더 비율 계산용: 지금 보고 있는 마감 시각과, 그 마감을 처음 본 순간의 남은 시간
+    // 서버의 턴/정리 시간 길이는 동기화되지 않으므로 마감 시각이 바뀌는 순간의 남은 시간을 전체 길이로 씀
+    private double timerEndTime = -1;
+    private float timerTotalSeconds = 1f;
+    private Image[] seatLabelImages = new Image[0];
+    private readonly Vector3[] avoidCorners = new Vector3[4];
     private float noticeHideTime;
 
     private void OnEnable()
@@ -141,6 +209,33 @@ public class LexioUI : MonoBehaviour
         defaultSelectionColor = selectionText.color;
         connectStatusText.text = "";
         noticeText.text = "";
+
+        // 표시 전용 (플레이어가 끌어서 바꾸지 못하게)
+        if (timerSlider != null)
+        {
+            timerSlider.interactable = false;
+            if (timerSlider.fillRect != null)
+            {
+                timerFillImage = timerSlider.fillRect.GetComponent<Image>();
+            }
+        }
+        if (timerFillImage != null)
+        {
+            timerDefaultSprite = timerFillImage.sprite;
+        }
+        if (timerRoot != null)
+        {
+            timerDefaultRotation = timerRoot.localRotation;
+        }
+        if (myInfoPanel != null)
+        {
+            myInfoDefaultColor = myInfoPanel.color;
+        }
+        seatLabelImages = new Image[seatLabels.Length];
+        for (int i = 0; i < seatLabels.Length; i++)
+        {
+            seatLabelImages[i] = seatLabels[i].GetComponent<Image>();
+        }
     }
 
     private void Update()
@@ -204,7 +299,7 @@ public class LexioUI : MonoBehaviour
                     isSelectionDirty = false;
                     RefreshSelection(table, local.Seat);
                 }
-                UpdateTimer(table);
+                UpdateTimer(table, local.Seat);
                 UpdateSeatLabelPositions(table, local.Seat);
             }
             else
@@ -326,9 +421,13 @@ public class LexioUI : MonoBehaviour
                     }
                 }
             }
-            builder.Clear();
-            builder.Append("패 정리 시간 (준비 ").Append(readyCount).Append(" / ").Append(humanCount).Append(')');
-            turnText.text = builder.ToString();
+            turnText.text = "패 정리 시간";
+            if (readyCountText != null)
+            {
+                builder.Clear();
+                builder.Append("준비 ").Append(readyCount).Append(" / ").Append(humanCount);
+                readyCountText.text = builder.ToString();
+            }
         }
         else if (table.Phase == GamePhase.Playing && table.CurrentSeat >= 0)
         {
@@ -353,19 +452,26 @@ public class LexioUI : MonoBehaviour
             turnText.text = "";
         }
 
+        if (readyPanel != null)
+        {
+            SetActive(readyPanel, table.IsPreparing);
+        }
+
         RefreshSettle(table);
+        RefreshSettleBubbles(table);
 
         if (mySeat >= 0 && mySeat < table.Seats.Count)
         {
             SeatInfo mine = table.Seats[mySeat];
-            builder.Clear();
-            builder.Append(mine.nickname).Append("\n칩 ").Append(chipView.GetShownChips(mySeat, mine.chips)).Append("\n남은 패 ").Append(mine.tileCount).Append("장");
-            if (isSettling)
-            {
-                builder.Append("\n정산 ");
-                AppendSettleText(mine, settleChanges[mySeat]);
-            }
-            myInfoText.text = builder.ToString();
+            myNameText.text = mine.nickname;
+            SetNumberText(myChipText, chipView.GetShownChips(mySeat, mine.chips));
+            SetNumberText(myTileText, mine.tileCount);
+            SetProfile(myProfileImage, mine.profileImage);
+        }
+        if (myReadyIcon != null)
+        {
+            bool isMeReady = mySeat >= 0 && mySeat < table.Seats.Count && table.Seats[mySeat].isReady;
+            SetActive(myReadyIcon, table.IsPreparing && isMeReady);
         }
 
         // 마지막 낸 패: 상태가 바뀔 때 한 번만 판정해서 보관 (제출 가능 여부 계산에도 재사용)
@@ -441,9 +547,11 @@ public class LexioUI : MonoBehaviour
     }
 
     // 남은 초가 바뀔 때만 텍스트 교체 (숫자 문자열은 캐시)
-    private void UpdateTimer(LexioTable table)
+    // 내 차례 알림(내 정보 깜빡임, 남은 시간 경고)도 여기서 매 프레임 갱신
+    private void UpdateTimer(LexioTable table, int mySeat)
     {
         int seconds = -1;
+        float remaining = 0f;
         // 패 돌리는 중에는 표시 안 함 (서버 마감 시간에 연출 시간이 더해져 있음)
         if (table.Phase == GamePhase.Playing && table.CurrentSeat >= 0 && clientView.IsDealing == false)
         {
@@ -452,12 +560,8 @@ public class LexioUI : MonoBehaviour
             {
                 endTime = table.PrepareEndTime;
             }
-            double remaining = endTime - NetworkTime.time;
-            if (remaining < 0)
-            {
-                remaining = 0;
-            }
-            seconds = Mathf.CeilToInt((float)remaining);
+            remaining = Mathf.Max(0f, (float)(endTime - NetworkTime.time));
+            seconds = Mathf.CeilToInt(remaining);
         }
 
         if (seconds != shownSeconds)
@@ -465,43 +569,200 @@ public class LexioUI : MonoBehaviour
             shownSeconds = seconds;
             timerText.text = GetSecondText(seconds);
         }
+
+        // 슬라이더는 부드럽게 줄어들도록 매 프레임 갱신 (할당 없음)
+        if (timerSlider != null)
+        {
+            timerSlider.normalizedValue = GetTimerRatio(table);
+        }
+
+        bool isMyTurn = mySeat >= 0 && table.Phase == GamePhase.Playing && table.IsPreparing == false && table.CurrentSeat == mySeat;
+        UpdateMyTurnHighlight(isMyTurn);
+        UpdateTimerWarning(isMyTurn && seconds >= 0 && seconds <= timerWarningSeconds);
+    }
+
+    // 내 차례 동안 내 정보 배경을 myTurnColor와 원래 색 사이 반쯤까지 오가게 함. 아니면 원래 색
+    private void UpdateMyTurnHighlight(bool isMyTurn)
+    {
+        if (myInfoPanel != null)
+        {
+            Color color = myInfoDefaultColor;
+            if (isMyTurn)
+            {
+                float pulse = (Mathf.Sin(Time.time * myTurnPulseSpeed) + 1f) * 0.5f;
+                color = Color.Lerp(myTurnColor, myInfoDefaultColor, pulse * 0.5f);
+            }
+            if (myInfoPanel.color != color)
+            {
+                myInfoPanel.color = color;
+            }
+        }
+    }
+
+    // 남은 시간 경고: 켜지고 꺼질 때만 게이지 이미지를 바꾸고, 켜져 있는 동안 타이머 전체를 좌우로 흔듦 (숫자는 그대로)
+    private void UpdateTimerWarning(bool isWarning)
+    {
+        if (isWarning != isTimerWarning)
+        {
+            isTimerWarning = isWarning;
+            if (timerFillImage != null && timerWarningSprite != null)
+            {
+                if (isWarning)
+                {
+                    timerFillImage.sprite = timerWarningSprite;
+                }
+                else
+                {
+                    timerFillImage.sprite = timerDefaultSprite;
+                }
+            }
+            if (isWarning == false && timerRoot != null)
+            {
+                timerRoot.localRotation = timerDefaultRotation;
+            }
+        }
+
+        if (isWarning && timerRoot != null)
+        {
+            float angle = Mathf.Sin(Time.time * timerShakeSpeed) * timerShakeAngle;
+            timerRoot.localRotation = timerDefaultRotation * Quaternion.Euler(0f, 0f, angle);
+        }
+    }
+
+    // 남은 시간 비율. 타이머를 표시하지 않는 동안에는 0
+    private float GetTimerRatio(LexioTable table)
+    {
+        float ratio = 0f;
+        if (table.Phase == GamePhase.Playing && table.CurrentSeat >= 0 && clientView.IsDealing == false)
+        {
+            double endTime = table.TurnDeadline;
+            if (table.IsPreparing)
+            {
+                endTime = table.PrepareEndTime;
+            }
+            float remaining = Mathf.Max(0f, (float)(endTime - NetworkTime.time));
+            if (endTime != timerEndTime)
+            {
+                timerEndTime = endTime;
+                timerTotalSeconds = Mathf.Max(0.01f, remaining);
+            }
+            ratio = Mathf.Clamp01(remaining / timerTotalSeconds);
+        }
+        else
+        {
+            // 다음에 타이머가 다시 보일 때 그 순간의 남은 시간을 전체 길이로 다시 잡음
+            timerEndTime = -1;
+        }
+        return ratio;
     }
 
     private void RefreshSeatLabelTexts(LexioTable table, int mySeat)
     {
-        for (int i = 0; i < seatLabelTexts.Length; i++)
+        for (int i = 0; i < seatNameTexts.Length; i++)
         {
             if (i < table.Seats.Count && i != mySeat)
             {
                 SeatInfo info = table.Seats[i];
-                builder.Clear();
-                builder.Append(info.nickname);
                 if (info.isAi)
                 {
-                    builder.Append(" (AI)");
-                }
-                builder.Append("\n칩 ").Append(chipView.GetShownChips(i, info.chips)).Append(" · ").Append(info.tileCount).Append("장");
-                if (table.IsPreparing && info.isReady)
-                {
-                    builder.Append(" · 준비");
-                }
-                if (isSettling)
-                {
-                    builder.Append('\n');
-                    AppendSettleText(info, settleChanges[i]);
-                }
-                seatLabelTexts[i].text = builder.ToString();
-
-                if (table.Phase == GamePhase.Playing && table.CurrentSeat == i)
-                {
-                    seatLabelTexts[i].color = turnLabelColor;
+                    seatNameTexts[i].text = info.nickname + " (AI)";
                 }
                 else
                 {
-                    seatLabelTexts[i].color = normalLabelColor;
+                    seatNameTexts[i].text = info.nickname;
                 }
+                SetNumberText(GetArrayItem(seatChipTexts, i), chipView.GetShownChips(i, info.chips));
+                SetNumberText(GetArrayItem(seatTileTexts, i), info.tileCount);
+                SetProfile(GetArrayItem(seatProfileImages, i), info.profileImage);
+
+                // 준비 아이콘은 패 정리 시간에만. 정리 시간이 끝나면(게임 시작) 모두 꺼짐
+                GameObject readyIcon = GetArrayItem(seatReadyIcons, i);
+                if (readyIcon != null)
+                {
+                    SetActive(readyIcon, table.IsPreparing && info.isReady);
+                }
+
+                bool isTurn = table.Phase == GamePhase.Playing && table.IsPreparing == false && table.CurrentSeat == i;
+                SetLabelSprite(i, isTurn);
             }
         }
+    }
+
+    private void SetLabelSprite(int seat, bool isTurn)
+    {
+        Image labelImage = GetArrayItem(seatLabelImages, seat);
+        Sprite sprite = normalLabelSprite;
+        if (isTurn)
+        {
+            sprite = turnLabelSprite;
+        }
+
+        if (labelImage != null && sprite != null)
+        {
+            labelImage.sprite = sprite;
+        }
+    }
+
+    // 정산 중이면 자리마다 계산식을 말풍선에 넘기고, 아니면 모두 끔
+    private void RefreshSettleBubbles(LexioTable table)
+    {
+        if (bubbleView != null)
+        {
+            if (isSettling)
+            {
+                for (int i = 0; i < table.Seats.Count; i++)
+                {
+                    builder.Clear();
+                    AppendSettleText(table.Seats[i], settleChanges[i]);
+                    bubbleView.SetSettleText(i, builder.ToString());
+                }
+            }
+            else
+            {
+                bubbleView.ClearSettleTexts();
+            }
+        }
+    }
+
+    // 숫자 문자열은 0~99 캐시 재사용 (칩/패 수는 상태가 바뀔 때만 호출됨)
+    private void SetNumberText(Text target, int number)
+    {
+        if (target != null)
+        {
+            if (number >= 0)
+            {
+                target.text = GetSecondText(number);
+            }
+            else
+            {
+                target.text = number.ToString();
+            }
+        }
+    }
+
+    // 프로필 번호가 프로필 목록 범위를 넘으면 0번 이미지 사용. 목록이 비어 있으면 씬에 넣은 이미지 그대로 둠
+    private void SetProfile(Image target, int profileImage)
+    {
+        if (target != null && profileSprites != null && profileSprites.Length > 0)
+        {
+            int index = profileImage;
+            if (index < 0 || index >= profileSprites.Length)
+            {
+                index = 0;
+            }
+            target.sprite = profileSprites[index];
+        }
+    }
+
+    // 배열이 비어 있거나 짧아도 안전하게 꺼냄 (씬에 없는 칸은 null)
+    private T GetArrayItem<T>(T[] items, int index) where T : Object
+    {
+        T item = null;
+        if (items != null && index >= 0 && index < items.Length)
+        {
+            item = items[index];
+        }
+        return item;
     }
 
     // 라운드 정산 중인지와 자리별 칩 변화. 정산 장수는 라운드가 끝났을 때만 0이 아님 (다음 라운드 시작 때 0으로 돌아감)
@@ -525,7 +786,8 @@ public class LexioUI : MonoBehaviour
         }
     }
 
-    // "4장 × 2 = 8 · 칩 -5" (2가 없으면 "4장 · 칩 -5")
+    // 말풍선 두 줄: "4장 × 2 = 8" / "칩 -5" (2가 없으면 첫 줄은 "4장")
+    // 칩 변화는 얻으면 chipGainColor, 잃으면 chipLossColor (정산 때만 만들어지므로 색 문자열 할당은 괜찮음)
     private void AppendSettleText(SeatInfo info, int change)
     {
         builder.Append(info.tileCount).Append("장");
@@ -533,12 +795,26 @@ public class LexioUI : MonoBehaviour
         {
             builder.Append(" × ").Append(info.settleCount / info.tileCount).Append(" = ").Append(info.settleCount);
         }
-        builder.Append(" · 칩 ");
+        builder.Append('\n');
+        if (change != 0)
+        {
+            Color changeColor = chipLossColor;
+            if (change > 0)
+            {
+                changeColor = chipGainColor;
+            }
+            builder.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(changeColor)).Append('>');
+        }
+        builder.Append("칩 ");
         if (change > 0)
         {
             builder.Append('+');
         }
         builder.Append(change);
+        if (change != 0)
+        {
+            builder.Append("</color>");
+        }
     }
 
     // 위치 계산만 매 프레임 (할당 없음)
@@ -556,12 +832,49 @@ public class LexioUI : MonoBehaviour
                     if (screenPoint.z > 0f)
                     {
                         isVisible = true;
-                        seatLabels[i].position = new Vector3(screenPoint.x, screenPoint.y, 0f);
+                        seatLabels[i].position = GetAvoidedLabelPosition(seatLabels[i], screenPoint.x, screenPoint.y);
                     }
                 }
             }
             SetActive(seatLabels[i].gameObject, isVisible);
         }
+    }
+
+    // 이름표(+ 위 말풍선 자리)가 labelAvoidRects와 겹치면 그 바로 아래로 내린 위치를 돌려줌. 화면 밖으로는 나가지 않게 함
+    // 4인일 때 맞은편 상대 이름표를 차례 배너와 그 상대의 패 사이에 넣기 위함 (좌표는 화면 픽셀)
+    // 내린 이름표의 말풍선은 그대로 이름표 위에 뜸 (배너와 잠깐 겹칠 수 있음)
+    private Vector3 GetAvoidedLabelPosition(RectTransform label, float x, float y)
+    {
+        Vector3 scale = label.lossyScale;
+        Rect rect = label.rect;
+        float halfWidth = rect.width * scale.x * 0.5f;
+        float belowPivot = rect.height * scale.y * label.pivot.y;
+        // 이름표 피벗에서 이름표 맨 위까지의 높이
+        float labelAbovePivot = rect.height * (1f - label.pivot.y) * scale.y;
+        float bubbleReserve = labelBubbleReserve * scale.y;
+        float gap = labelAvoidGap * scale.y;
+        float resultY = y;
+        if (labelAvoidRects != null)
+        {
+            for (int i = 0; i < labelAvoidRects.Length; i++)
+            {
+                RectTransform avoid = labelAvoidRects[i];
+                if (avoid != null)
+                {
+                    // 0 = 왼쪽 아래, 2 = 오른쪽 위
+                    avoid.GetWorldCorners(avoidCorners);
+                    bool isOverlapY = resultY + labelAbovePivot + bubbleReserve > avoidCorners[0].y && resultY - belowPivot < avoidCorners[2].y;
+                    bool isOverlapX = x + halfWidth > avoidCorners[0].x && x - halfWidth < avoidCorners[2].x;
+                    if (isOverlapY && isOverlapX)
+                    {
+                        resultY = avoidCorners[0].y - gap - labelAbovePivot;
+                        bubbleReserve = 0f;
+                    }
+                }
+            }
+        }
+        float resultX = Mathf.Clamp(x, halfWidth, Screen.width - halfWidth);
+        return new Vector3(resultX, resultY, 0f);
     }
 
     private void HideSeatLabels()
@@ -788,7 +1101,7 @@ public class LexioUI : MonoBehaviour
 
     // ---------------- 최종 결과 ----------------
 
-    // 내 줄은 노란색으로 표시
+    // 순위 계산 후 결과 창(resultView)에 넘김. 글자 결과(resultText)가 있으면 내 줄은 노란색으로 표시
     private void RefreshResult(LexioTable table, int mySeat)
     {
         int count = table.Seats.Count;
@@ -817,6 +1130,19 @@ public class LexioUI : MonoBehaviour
             resultOrder.Insert(insertIndex, i);
         }
 
+        if (resultView != null)
+        {
+            resultView.Show(table, mySeat, resultOrder, resultRanks, resultChips, profileSprites);
+        }
+        if (resultText != null)
+        {
+            RefreshResultText(table, mySeat);
+        }
+    }
+
+    // 결과 창 없이 글자로만 표시할 때 (예전 씬)
+    private void RefreshResultText(LexioTable table, int mySeat)
+    {
         builder.Clear();
         builder.Append("최종 순위\n\n");
         for (int i = 0; i < resultOrder.Count; i++)

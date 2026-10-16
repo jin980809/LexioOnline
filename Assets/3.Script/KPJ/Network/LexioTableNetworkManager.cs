@@ -18,6 +18,8 @@ public class LexioTableNetworkManager : NetworkManager
 
     // 클라이언트가 접속 전에 입력한 닉네임
     public string PendingNickname { get; set; } = "";
+    // 클라이언트의 프로필 이미지 번호. 로그인 후 유저 DB의 imageNum을 넣어 두면 접속할 때 서버로 보냄
+    public int PendingProfileImage { get; set; }
 
     // 손패 수신 (타일 ID 배열, 새로 받은 패인지, 내 자리, 인원 수)
     // 자리/인원은 SyncVar보다 RPC가 먼저 도착할 수 있어서 손패와 함께 받음

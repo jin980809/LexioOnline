@@ -20,8 +20,8 @@ public class LexioTable : NetworkBehaviour
     // 한 게임에 진행할 라운드 수. 서버 프리팹 값이 기준이고, 클라이언트에는 SyncVar로 전달되어 UI 표시에 쓰임
     [SerializeField, Min(1), SyncVar] private int roundCount = GameRules.RoundCount;
 
-    // 게임 시작 시 각자 받는 칩 개수 (서버 전용, 클라이언트는 SeatInfo.chips로 받음)
-    [SerializeField, Min(0)] private int startingChips = GameRules.StartingChips;
+    // 게임 시작 시 각자 받는 칩 개수. 클라이언트에는 SyncVar로 전달되어 결과 창의 칩 증감 계산에 쓰임
+    [SerializeField, Min(0), SyncVar] private int startingChips = GameRules.StartingChips;
 
     [SyncVar(hook = nameof(OnPhaseChanged))] private GamePhase phase = GamePhase.Waiting;
     [SyncVar(hook = nameof(OnIntChanged))] private int maxNumber;
@@ -62,6 +62,11 @@ public class LexioTable : NetworkBehaviour
     public int RoundCount
     {
         get { return roundCount; }
+    }
+
+    public int StartingChips
+    {
+        get { return startingChips; }
     }
 
     public int CurrentSeat
@@ -249,6 +254,19 @@ public class LexioTable : NetworkBehaviour
                 info.nickname = trimmed;
                 seats[seat] = info;
             }
+        }
+    }
+
+    // 범위를 넘는 번호는 클라이언트가 기본 이미지로 표시하므로 음수만 막음
+    [Server]
+    public void ServerSetProfileImage(LexioPlayer player, int profileImage)
+    {
+        int seat = seatPlayers.IndexOf(player);
+        if (seat >= 0)
+        {
+            SeatInfo info = seats[seat];
+            info.profileImage = Mathf.Max(0, profileImage);
+            seats[seat] = info;
         }
     }
 
