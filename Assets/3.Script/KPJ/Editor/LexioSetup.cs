@@ -151,7 +151,7 @@ public class LexioSetup
         return material;
     }
 
-    // 드래그 중 손패 칸 표시용 반투명 머티리얼 (URP Unlit, 양면). 색은 LexioClientView가 칸마다 지정
+    // 드래그 중 손패 칸 표시용 반투명 머티리얼 (URP Unlit, 양면). 색은 HandView가 칸마다 지정
     private Material CreateHandSlotMaterial()
     {
         Material material = AssetDatabase.LoadAssetAtPath<Material>(HandSlotMaterialPath);
@@ -235,7 +235,9 @@ public class LexioSetup
         GameObject chipModel = LoadRequired<GameObject>(ChipModelPath);
 
         DestroyRoot("NetworkManager");
+        // 예전 구조(LexioClientView 하나)로 만든 오브젝트도 지움. 남아 있으면 타일이 두 벌 표시됨
         DestroyRoot("LexioClientView");
+        DestroyRoot("LexioTableView");
         DestroyRoot("ChipFlightView");
         DestroyRoot("LexioCanvas");
         DestroyRoot("EventSystem");
@@ -258,13 +260,37 @@ public class LexioSetup
         Object.DestroyImmediate(table.GetComponent<Collider>());
         table.GetComponent<MeshRenderer>().sharedMaterial = tableMaterial;
 
-        GameObject viewObject = new GameObject("LexioClientView");
-        LexioClientView clientView = viewObject.AddComponent<LexioClientView>();
+        // 3D 테이블 표시: 연결 담당(LexioTableView) + 기능별 컴포넌트를 한 오브젝트에 붙임
+        GameObject viewObject = new GameObject("LexioTableView");
+        LexioTableView clientView = viewObject.AddComponent<LexioTableView>();
+        HandView handView = viewObject.AddComponent<HandView>();
+        OpponentView opponentView = viewObject.AddComponent<OpponentView>();
+        CenterPlayView centerPlayView = viewObject.AddComponent<CenterPlayView>();
+        DealAnimator dealAnimator = viewObject.AddComponent<DealAnimator>();
+
         SetReference(clientView, "networkManager", manager);
         SetReference(clientView, "tileDatabase", database);
         SetReference(clientView, "outlineMaterial", outlineMaterial);
         SetReference(clientView, "viewCamera", viewCamera);
-        SetReference(clientView, "slotMaterial", handSlotMaterial);
+        SetReference(clientView, "handView", handView);
+        SetReference(clientView, "opponentView", opponentView);
+        SetReference(clientView, "centerPlayView", centerPlayView);
+        SetReference(clientView, "dealAnimator", dealAnimator);
+
+        SetReference(handView, "tableView", clientView);
+        SetReference(handView, "centerPlayView", centerPlayView);
+        SetReference(handView, "slotMaterial", handSlotMaterial);
+
+        SetReference(opponentView, "tableView", clientView);
+        SetReference(opponentView, "handView", handView);
+
+        SetReference(centerPlayView, "tableView", clientView);
+        SetReference(centerPlayView, "handView", handView);
+        SetReference(centerPlayView, "opponentView", opponentView);
+
+        SetReference(dealAnimator, "tableView", clientView);
+        SetReference(dealAnimator, "handView", handView);
+        SetReference(dealAnimator, "opponentView", opponentView);
 
         GameObject chipObject = new GameObject("ChipFlightView");
         ChipFlightView chipView = chipObject.AddComponent<ChipFlightView>();
@@ -299,7 +325,7 @@ public class LexioSetup
 
     // ---------------- UI ----------------
 
-    private void CreateUi(LexioTableNetworkManager manager, LexioClientView clientView, ChipFlightView chipView, Sprite ruleBookSprite)
+    private void CreateUi(LexioTableNetworkManager manager, LexioTableView clientView, ChipFlightView chipView, Sprite ruleBookSprite)
     {
         GameObject canvasObject = new GameObject("LexioCanvas");
         Canvas canvas = canvasObject.AddComponent<Canvas>();
@@ -341,18 +367,19 @@ public class LexioSetup
         Text turnText = CreateText("TurnText", gamePanel, "", 44, TextAnchor.UpperCenter, Corner(new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(900f, 70f)), true);
         Text lastPlayText = CreateText("LastPlayText", gamePanel, "", 34, TextAnchor.MiddleCenter, Center(new Vector2(0f, 150f), new Vector2(900f, 60f)), false);
 
-        // 하단 줄 (왼쪽부터): 시간 / 문양 정렬 / 숫자 정렬 / 제출 / 패스
+        // 하단 줄 (왼쪽부터): 시간 / 선택 해제 / 문양 정렬 / 숫자 정렬 / 제출 / 패스
         Text timerText = CreateText("TimerText", gamePanel, "", 56, TextAnchor.MiddleCenter, Corner(new Vector2(0f, 0f), new Vector2(40f, 30f), new Vector2(200f, 80f)), true);
-        Button sortSuitButton = CreateButton("SortSuitButton", gamePanel, "문양 정렬", Corner(new Vector2(0f, 0f), new Vector2(260f, 30f), new Vector2(220f, 80f)));
-        Button sortNumberButton = CreateButton("SortNumberButton", gamePanel, "숫자 정렬", Corner(new Vector2(0f, 0f), new Vector2(500f, 30f), new Vector2(220f, 80f)));
-        Button submitButton = CreateButton("SubmitButton", gamePanel, "제출", Corner(new Vector2(0f, 0f), new Vector2(740f, 30f), new Vector2(220f, 80f)));
-        Button passButton = CreateButton("PassButton", gamePanel, "패스", Corner(new Vector2(0f, 0f), new Vector2(980f, 30f), new Vector2(220f, 80f)));
+        Button clearSelectionButton = CreateButton("ClearSelectionButton", gamePanel, "선택 해제", Corner(new Vector2(0f, 0f), new Vector2(260f, 30f), new Vector2(220f, 80f)));
+        Button sortSuitButton = CreateButton("SortSuitButton", gamePanel, "문양 정렬", Corner(new Vector2(0f, 0f), new Vector2(500f, 30f), new Vector2(220f, 80f)));
+        Button sortNumberButton = CreateButton("SortNumberButton", gamePanel, "숫자 정렬", Corner(new Vector2(0f, 0f), new Vector2(740f, 30f), new Vector2(220f, 80f)));
+        Button submitButton = CreateButton("SubmitButton", gamePanel, "제출", Corner(new Vector2(0f, 0f), new Vector2(980f, 30f), new Vector2(220f, 80f)));
+        Button passButton = CreateButton("PassButton", gamePanel, "패스", Corner(new Vector2(0f, 0f), new Vector2(1220f, 30f), new Vector2(220f, 80f)));
         // 패 정리 시간에만 켜짐 (그동안 제출 버튼 대신 같은 자리에 표시)
-        Button readyButton = CreateButton("ReadyButton", gamePanel, "준비 완료", Corner(new Vector2(0f, 0f), new Vector2(740f, 30f), new Vector2(220f, 80f)));
+        Button readyButton = CreateButton("ReadyButton", gamePanel, "준비 완료", Corner(new Vector2(0f, 0f), new Vector2(980f, 30f), new Vector2(220f, 80f)));
         readyButton.gameObject.SetActive(false);
 
-        // 하단 줄 위: 왼쪽에 내 정보, 그 오른쪽은 3D 패 (LexioClientView.handCenter로 위치 맞춤)
-        Text myInfoText = CreateText("MyInfoText", gamePanel, "", 34, TextAnchor.LowerLeft, Corner(new Vector2(0f, 0f), new Vector2(40f, 290f), new Vector2(420f, 160f)), true);
+        // 하단 줄 위: 왼쪽에 내 정보, 그 오른쪽은 3D 패 (HandView.handCenter로 위치 맞춤)
+        Text myInfoText = CreateText("MyInfoText", gamePanel, "", 34, TextAnchor.LowerLeft, Corner(new Vector2(0f, 0f), new Vector2(40f, 205f), new Vector2(400f, 160f)), true);
         // 패 위 중앙: 선택한 패 정보
         Text selectionText = CreateText("SelectionText", gamePanel, "", 32, TextAnchor.MiddleCenter, Corner(new Vector2(0.5f, 0f), new Vector2(0f, 480f), new Vector2(700f, 50f)), false);
 
@@ -412,6 +439,7 @@ public class LexioSetup
         SetReference(ui, "lastPlayText", lastPlayText);
         SetReference(ui, "selectionText", selectionText);
         SetReference(ui, "myInfoText", myInfoText);
+        SetReference(ui, "clearSelectionButton", clearSelectionButton);
         SetReference(ui, "sortSuitButton", sortSuitButton);
         SetReference(ui, "sortNumberButton", sortNumberButton);
         SetReference(ui, "passButton", passButton);

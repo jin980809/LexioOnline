@@ -11,7 +11,7 @@ public class LexioTable : NetworkBehaviour
     // 라운드 끝 → 다음 라운드(또는 결과 화면)까지 대기. 클라이언트 ChipFlightView.maxSettleSeconds보다 길게 (정산 칩 연출 시간)
     [SerializeField] private float roundEndDelaySeconds = 5f;
 
-    // 라운드 시작 패 돌리기 연출 시간. 클라이언트 LexioClientView.dealSeconds보다 조금 길게 (지연 여유)
+    // 라운드 시작 패 돌리기 연출 시간. 클라이언트 DealAnimator.dealSeconds보다 조금 길게 (지연 여유)
     [SerializeField] private float dealSeconds = 2f;
 
     // 매 라운드 패를 받은 뒤 패를 보고 칸에 배치하는 시간. 이 동안은 아무도 낼 수 없음

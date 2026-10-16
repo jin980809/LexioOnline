@@ -11,7 +11,7 @@ public class ChipFlightView : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private LexioTableNetworkManager networkManager;
-    [SerializeField] private LexioClientView clientView;
+    [SerializeField] private LexioTableView clientView;
     [SerializeField] private GameObject chipPrefab;
 
     [Header("Chip")]
