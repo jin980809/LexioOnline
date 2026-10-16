@@ -13,17 +13,17 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: M_Glow
-    second: {fileID: 2100000, guid: 3af94dd970bb9e9449b6b00e9b260675, type: 2}
+    second: {fileID: 2100000, guid: e3cf52631cced324cb93a5cc40f1f69b, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: M_Gold
-    second: {fileID: 2100000, guid: a6f003ca8d8a4924facb76630545fe1b, type: 2}
+    second: {fileID: 2100000, guid: e902435d46d01bb4bbd147ea7665a845, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: M_NavyMetal
-    second: {fileID: 2100000, guid: ce8d59ad8c2c58342b940a034b696076, type: 2}
+    second: {fileID: 2100000, guid: 58a1462d112f78947b6a36a584898ebd, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

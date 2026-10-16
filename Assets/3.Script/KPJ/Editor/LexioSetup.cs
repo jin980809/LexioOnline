@@ -31,6 +31,8 @@ public class LexioSetup
     private const string ChipModelPath = "Assets/2.Model/PokerChip.obj";
     // 카툰 테이블 모델. 없으면 초록 평면으로 대신함
     private const string TableModelPath = "Assets/4.Sprite/LexioTable_Toon/LexioTable.fbx";
+    // 테이블 부품 머티리얼 폴더. fbx 임포트 설정의 M_Felt 연결이 깨져 있어서 Setup이 부품마다 직접 지정함
+    private const string TableModelMaterialFolder = "Assets/6.Materials/Table";
     // 게임 화면 UI 이미지 폴더 / 글꼴 / 배경. 없는 이미지는 경고만 남기고 기본 모양으로 만듦
     private const string UiSpriteFolder = "Assets/4.Sprite/LexioUI";
     private const string GameFontPath = "Assets/9.Font/Jua-Regular.ttf";
@@ -354,6 +356,7 @@ public class LexioSetup
             table.transform.position = new Vector3(0f, -7.55f, -0.5f);
             table.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
             table.transform.localScale = new Vector3(10f, 10f, 10f);
+            AssignTableMaterials(table.transform);
         }
         else
         {
@@ -365,6 +368,43 @@ public class LexioSetup
             table.transform.localScale = new Vector3(1.8f, 1f, 1.6f);
             Object.DestroyImmediate(table.GetComponent<Collider>());
             table.GetComponent<MeshRenderer>().sharedMaterial = tableMaterial;
+        }
+    }
+
+    // 테이블 부품(자식 오브젝트 이름)별 머티리얼. 씬에서 맞춘 값
+    private void AssignTableMaterials(Transform table)
+    {
+        string[] partNames =
+        {
+            "Felt",
+            "Base_Bottom", "Base_Side", "Pedestal_Collar", "Pedestal_Column", "Rim_BlueBand", "Rim_SideApron",
+            "Base_BottomTrim", "Pedestal_WaistRing", "Rim_YellowLip",
+            "Base_TopTrim", "Rim_CreamBand"
+        };
+        string[] materialNames =
+        {
+            "M_Felt",
+            "M_BluePanel", "M_BluePanel", "M_BluePanel", "M_BluePanel", "M_BluePanel", "M_BluePanel",
+            "M_Yellow", "M_Yellow", "M_Yellow",
+            "M_Cream", "M_Cream"
+        };
+
+        for (int i = 0; i < partNames.Length; i++)
+        {
+            Transform part = table.Find(partNames[i]);
+            Material material = LoadRequired<Material>(TableModelMaterialFolder + "/" + materialNames[i] + ".mat");
+            if (part == null)
+            {
+                Debug.LogWarning("[Lexio] 테이블 부품 없음: " + partNames[i]);
+            }
+            else if (material != null)
+            {
+                MeshRenderer partRenderer = part.GetComponent<MeshRenderer>();
+                if (partRenderer != null)
+                {
+                    partRenderer.sharedMaterial = material;
+                }
+            }
         }
     }
 

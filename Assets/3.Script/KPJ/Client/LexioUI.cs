@@ -142,6 +142,7 @@ public class LexioUI : MonoBehaviour
     private readonly List<int> resultOrder = new List<int>();
     private int[] resultChips = new int[0];
     private int[] resultRanks = new int[0];
+    private bool[] resultLeavers = new bool[0];
     private readonly List<int> settleCounts = new List<int>();
     private int[] settleChanges = new int[0];
     private bool isSettling;
@@ -1108,12 +1109,15 @@ public class LexioUI : MonoBehaviour
         if (resultChips.Length != count)
         {
             resultChips = new int[count];
+            resultLeavers = new bool[count];
         }
         for (int i = 0; i < count; i++)
         {
             resultChips[i] = table.Seats[i].chips;
+            // 게임 도중 나간 자리만 isAi가 켜짐 (게임이 끝난 뒤 나간 사람은 이탈자가 아님)
+            resultLeavers[i] = table.Seats[i].isAi;
         }
-        resultRanks = ScoreCalculator.CalculateRanks(resultChips);
+        resultRanks = ScoreCalculator.CalculateRanks(resultChips, resultLeavers);
 
         // 순위 오름차순 정렬 (인원이 최대 5명이라 단순 삽입 정렬)
         resultOrder.Clear();

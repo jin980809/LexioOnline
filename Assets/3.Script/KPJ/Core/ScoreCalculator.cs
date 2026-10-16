@@ -33,20 +33,38 @@ public static class ScoreCalculator
     }
 
     // 칩 많은 순 순위, 동점은 공동 순위 (1, 1, 3 ...)
-    public static int[] CalculateRanks(IReadOnlyList<int> chips)
+    // 이탈자(isLeaver)는 칩과 상관없이 남은 사람들 다음 순위로 모두 공동 꼴등
+    // 예: 5인전에서 2명 이탈 → 남은 3명이 칩 순으로 1~3위, 이탈자 2명은 둘 다 4위
+    public static int[] CalculateRanks(IReadOnlyList<int> chips, IReadOnlyList<bool> isLeaver)
     {
         int[] ranks = new int[chips.Count];
+        int stayedCount = 0;
         for (int i = 0; i < chips.Count; i++)
         {
-            int higherCount = 0;
-            for (int j = 0; j < chips.Count; j++)
+            if (isLeaver[i] == false)
             {
-                if (chips[j] > chips[i])
-                {
-                    higherCount++;
-                }
+                stayedCount++;
             }
-            ranks[i] = higherCount + 1;
+        }
+
+        for (int i = 0; i < chips.Count; i++)
+        {
+            if (isLeaver[i])
+            {
+                ranks[i] = stayedCount + 1;
+            }
+            else
+            {
+                int higherCount = 0;
+                for (int j = 0; j < chips.Count; j++)
+                {
+                    if (isLeaver[j] == false && chips[j] > chips[i])
+                    {
+                        higherCount++;
+                    }
+                }
+                ranks[i] = higherCount + 1;
+            }
         }
         return ranks;
     }
