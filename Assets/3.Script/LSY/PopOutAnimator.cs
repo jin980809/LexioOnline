@@ -8,6 +8,19 @@ public class PopOutAnimator : MonoBehaviour
     [Header("연출 설정")]
     [SerializeField] private PopupSettings setting;
 
+/*
+적용방법:
+1) PopOutAnimator 스크립트를 튀어나오게 연출하고 싶은 판넬에 붙이기
+2) Setting에는 Prefabs 파일에 있는 "PopupSettings"라는 애 적용하기
+3) 버튼에 OnClick 할당할 때 판넬째로 드래그
+4) 액션은 PopOutAnimator.Open / Close로 연출하면서 열리게 혹은 닫히게 설정하기
+
+    예시 - 설정 화면
+    a) 설정 판넬에 스크립트 놓기
+    b) 설정 버튼에 설정 판넬 적용한 OnClick을 통해 PopOutAnimator.Open 설정
+    c) 설정 판넬의 X(닫기) 버튼에 설정 판넬 적용한 OnClick중 PopOutAnimtor.Close로 해두기
+*/
+
     private float openTime
     {
         get 

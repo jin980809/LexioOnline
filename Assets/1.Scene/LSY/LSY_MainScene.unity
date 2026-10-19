@@ -11349,6 +11349,81 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1041667265}
   m_CullTransparentMesh: 1
+--- !u!1 &1050482196
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1050482197}
+  - component: {fileID: 1050482199}
+  - component: {fileID: 1050482198}
+  m_Layer: 0
+  m_Name: Row1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1050482197
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1050482196}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1867249480}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -2.8239, y: 0}
+  m_SizeDelta: {x: 721.2585, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1050482198
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1050482196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 4e3c0bb4b1df9374195c07491197eb83, type: 3}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1050482199
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1050482196}
+  m_CullTransparentMesh: 1
 --- !u!1 &1055214229
 GameObject:
   m_ObjectHideFlags: 0
@@ -17709,6 +17784,8 @@ MonoBehaviour:
   - {fileID: 103740767}
   - {fileID: 998069430}
   - {fileID: 15858795}
+  myBubble: {fileID: 0}
+  myBubbleText: {fileID: 0}
   bubbleSeconds: 2
 --- !u!114 &1659872933
 MonoBehaviour:
@@ -17740,30 +17817,57 @@ MonoBehaviour:
   sortNumberButton: {fileID: 1745287279}
   readyButton: {fileID: 1549862692}
   timerText: {fileID: 1723193842}
+  timerSlider: {fileID: 0}
+  timerWarningSeconds: 5
+  timerWarningSprite: {fileID: 0}
+  timerRoot: {fileID: 0}
+  timerShakeAngle: 8
+  timerShakeSpeed: 25
   roundText: {fileID: 1033126099}
   turnText: {fileID: 489019977}
-  myInfoText: {fileID: 1833735853}
+  readyPanel: {fileID: 0}
+  readyCountText: {fileID: 0}
   selectionText: {fileID: 2022172971}
   lastPlayText: {fileID: 812996547}
+  myNameText: {fileID: 1833735853}
+  myChipText: {fileID: 0}
+  myTileText: {fileID: 0}
+  myProfileImage: {fileID: 0}
+  myReadyIcon: {fileID: 0}
+  myInfoPanel: {fileID: 0}
+  myTurnColor: {r: 1, g: 0.85, b: 0.4, a: 1}
+  myTurnPulseSpeed: 4
   seatLabels:
   - {fileID: 1873759805}
   - {fileID: 1536334853}
   - {fileID: 524498379}
   - {fileID: 1470626776}
   - {fileID: 1546905260}
-  seatLabelTexts:
+  seatNameTexts:
   - {fileID: 546473112}
   - {fileID: 1576607510}
   - {fileID: 2010251686}
   - {fileID: 1679016986}
   - {fileID: 1870135010}
+  seatChipTexts: []
+  seatTileTexts: []
+  seatProfileImages: []
+  seatReadyIcons: []
+  normalLabelSprite: {fileID: 0}
+  turnLabelSprite: {fileID: 0}
+  labelAvoidRects: []
+  labelBubbleReserve: 100
+  labelAvoidGap: 16
+  profileSprites: []
+  bubbleView: {fileID: 0}
+  chipGainColor: {r: 0.2, g: 0.6, b: 0.25, a: 1}
+  chipLossColor: {r: 0.85, g: 0.25, b: 0.2, a: 1}
   resultPanel: {fileID: 1867249479}
+  resultView: {fileID: 0}
   resultText: {fileID: 1303528867}
   exitButton: {fileID: 193095512}
   noticeText: {fileID: 1940528682}
   noticeSeconds: 3
-  normalLabelColor: {r: 1, g: 1, b: 1, a: 1}
-  turnLabelColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   playableSelectionColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   myResultColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   unavailableButtonAlpha: 0.5
@@ -20609,7 +20713,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1867249480
 RectTransform:
   m_ObjectHideFlags: 0
@@ -20624,6 +20728,7 @@ RectTransform:
   m_Children:
   - {fileID: 1303528865}
   - {fileID: 193095515}
+  - {fileID: 1050482197}
   m_Father: {fileID: 1659872937}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -20644,15 +20749,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.85}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.85}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 6c7934d8176cfb849a64534d87174987, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
