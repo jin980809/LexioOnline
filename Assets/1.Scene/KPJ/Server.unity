@@ -383,7 +383,7 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &1698306751
+--- !u!1 &1813016315
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -391,9 +391,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1698306754}
-  - component: {fileID: 1698306753}
-  - component: {fileID: 1698306752}
+  - component: {fileID: 1813016318}
+  - component: {fileID: 1813016317}
+  - component: {fileID: 1813016316}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -401,13 +401,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1698306752
+--- !u!114 &1813016316
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698306751}
+  m_GameObject: {fileID: 1813016315}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea9d1d63ca2a86e499192f1f3023b178, type: 3}
@@ -421,8 +421,8 @@ MonoBehaviour:
   offlineScene: 
   onlineScene: 
   offlineSceneLoadDelay: 0
-  transport: {fileID: 1698306753}
-  networkAddress: 172.30.1.8
+  transport: {fileID: 1813016317}
+  networkAddress: 192.168.1.44
   maxConnections: 5
   disconnectInactiveConnections: 0
   disconnectInactiveTimeout: 60
@@ -449,13 +449,13 @@ MonoBehaviour:
   timeInterpolationGui: 0
   startAsServer: 1
   tablePrefab: {fileID: 493788688936497039, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
---- !u!114 &1698306753
+--- !u!114 &1813016317
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698306751}
+  m_GameObject: {fileID: 1813016315}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b0fecffa3f624585964b0d0eb21b18e, type: 3}
@@ -478,13 +478,13 @@ MonoBehaviour:
   debugLog: 0
   statisticsGUI: 0
   statisticsLog: 0
---- !u!4 &1698306754
+--- !u!4 &1813016318
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1698306751}
+  m_GameObject: {fileID: 1813016315}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -499,4 +499,4 @@ SceneRoots:
   m_Roots:
   - {fileID: 834761553}
   - {fileID: 1426260977}
-  - {fileID: 1698306754}
+  - {fileID: 1813016318}

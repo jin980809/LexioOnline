@@ -100,11 +100,13 @@ public class LexioUI : MonoBehaviour
     // 이름표 배경(seatLabels의 Image). 차례인 사람만 turnLabelSprite로 바뀜. 둘 다 비어 있으면 바꾸지 않음
     [SerializeField] private Sprite normalLabelSprite;
     [SerializeField] private Sprite turnLabelSprite;
-    // 이름표가 가리면 안 되는 UI (차례 배너, 준비 인원 패널). 겹치면 이름표를 그 바로 아래(배너와 상대 패 사이)로 내림
+    // 이름표와 그 위 말풍선이 가리면 안 되는 UI (차례 배너, 준비 인원 패널). 겹치면 이름표를 겹치지 않을 만큼만 옆으로 옮김
     // 꺼져 있어도 피함 (준비 패널이 켜지고 꺼질 때 이름표가 들썩이지 않도록)
     [SerializeField] private RectTransform[] labelAvoidRects;
     // 이름표 위에 뜨는 말풍선 자리 (캔버스 단위). 겹침 판정 때 이름표 위로 이만큼 더 있다고 봄
     [SerializeField] private float labelBubbleReserve = 100f;
+    // 말풍선 자리의 너비 (캔버스 단위). 말풍선은 글자 길이에 따라 너비가 바뀌므로 긴 문구("스트레이트 플러시 해 15") 기준으로 잡음
+    [SerializeField] private float labelBubbleReserveWidth = 440f;
     // 비켜 놓을 때 띄우는 간격 (캔버스 단위)
     [SerializeField] private float labelAvoidGap = 16f;
 
@@ -404,9 +406,16 @@ public class LexioUI : MonoBehaviour
 
     private void RefreshGame(LexioTable table, int mySeat)
     {
-        roundText.text = "라운드 " + table.RoundNumber + " / " + table.RoundCount;
+        roundText.text = "라운드 <color=#FF0000>" + table.RoundNumber + "</color> / " + table.RoundCount;
 
-        if (table.IsPreparing)
+        // 차례 배너에 정산 시간을 표시해야 하므로 정산 여부를 먼저 계산
+        RefreshSettle(table);
+
+        if (isSettling)
+        {
+            turnText.text = "정산 시간";
+        }
+        else if (table.IsPreparing)
         {
             // AI(나간 자리)는 서버가 준비된 것으로 보므로 사람만 셈
             int humanCount = 0;
@@ -458,7 +467,6 @@ public class LexioUI : MonoBehaviour
             SetActive(readyPanel, table.IsPreparing);
         }
 
-        RefreshSettle(table);
         RefreshSettleBubbles(table);
 
         if (mySeat >= 0 && mySeat < table.Seats.Count)
@@ -787,14 +795,18 @@ public class LexioUI : MonoBehaviour
         }
     }
 
-    // 말풍선 두 줄: "4장 × 2 = 8" / "칩 -5" (2가 없으면 첫 줄은 "4장")
+    // 말풍선 두 줄: "4장 × 2 = 8점" / "칩 -5" (2가 없으면 첫 줄은 "4장 = 4점")
     // 칩 변화는 얻으면 chipGainColor, 잃으면 chipLossColor (정산 때만 만들어지므로 색 문자열 할당은 괜찮음)
     private void AppendSettleText(SeatInfo info, int change)
     {
         builder.Append(info.tileCount).Append("장");
         if (info.tileCount > 0 && info.settleCount > info.tileCount)
         {
-            builder.Append(" × ").Append(info.settleCount / info.tileCount).Append(" = ").Append(info.settleCount);
+            builder.Append(" × ").Append(info.settleCount / info.tileCount).Append(" = ").Append(info.settleCount).Append("점");
+        }
+        else
+        {
+            builder.Append(" = ").Append(info.tileCount).Append("점");
         }
         builder.Append('\n');
         if (change != 0)
@@ -841,9 +853,10 @@ public class LexioUI : MonoBehaviour
         }
     }
 
-    // 이름표(+ 위 말풍선 자리)가 labelAvoidRects와 겹치면 그 바로 아래로 내린 위치를 돌려줌. 화면 밖으로는 나가지 않게 함
-    // 4인일 때 맞은편 상대 이름표를 차례 배너와 그 상대의 패 사이에 넣기 위함 (좌표는 화면 픽셀)
-    // 내린 이름표의 말풍선은 그대로 이름표 위에 뜸 (배너와 잠깐 겹칠 수 있음)
+    // 이름표(+ 위 말풍선 자리)가 labelAvoidRects와 겹치면 겹치지 않을 만큼만 옆으로 옮긴 위치를 돌려줌. 화면 밖으로는 나가지 않게 함
+    // 4인일 때 맞은편 상대 이름표의 말풍선이 차례 배너를 가리지 않게 하기 위함 (좌표는 화면 픽셀)
+    // 높이는 그대로 두므로 이름표가 상대 패 위에 있고, 말풍선도 그대로 이름표 위에 뜸
+    // 옮기는 방향은 피할 UI의 가운데 기준으로 이름표가 있던 쪽 (정가운데면 오른쪽)
     private Vector3 GetAvoidedLabelPosition(RectTransform label, float x, float y)
     {
         Vector3 scale = label.lossyScale;
@@ -852,9 +865,12 @@ public class LexioUI : MonoBehaviour
         float belowPivot = rect.height * scale.y * label.pivot.y;
         // 이름표 피벗에서 이름표 맨 위까지의 높이
         float labelAbovePivot = rect.height * (1f - label.pivot.y) * scale.y;
-        float bubbleReserve = labelBubbleReserve * scale.y;
-        float gap = labelAvoidGap * scale.y;
-        float resultY = y;
+        float labelTop = y + labelAbovePivot;
+        float labelBottom = y - belowPivot;
+        float bubbleTop = labelTop + labelBubbleReserve * scale.y;
+        float bubbleHalfWidth = labelBubbleReserveWidth * scale.x * 0.5f;
+        float gap = labelAvoidGap * scale.x;
+        float resultX = x;
         if (labelAvoidRects != null)
         {
             for (int i = 0; i < labelAvoidRects.Length; i++)
@@ -864,18 +880,43 @@ public class LexioUI : MonoBehaviour
                 {
                     // 0 = 왼쪽 아래, 2 = 오른쪽 위
                     avoid.GetWorldCorners(avoidCorners);
-                    bool isOverlapY = resultY + labelAbovePivot + bubbleReserve > avoidCorners[0].y && resultY - belowPivot < avoidCorners[2].y;
-                    bool isOverlapX = x + halfWidth > avoidCorners[0].x && x - halfWidth < avoidCorners[2].x;
-                    if (isOverlapY && isOverlapX)
+                    float avoidLeft = avoidCorners[0].x;
+                    float avoidRight = avoidCorners[2].x;
+                    float avoidBottom = avoidCorners[0].y;
+                    float avoidTop = avoidCorners[2].y;
+
+                    // 이름표와 말풍선 중 실제로 겹치는 것의 절반 너비만큼만 비킴
+                    float needHalfWidth = 0f;
+                    bool isLabelOverlapY = labelTop > avoidBottom && labelBottom < avoidTop;
+                    bool isLabelOverlapX = resultX + halfWidth > avoidLeft && resultX - halfWidth < avoidRight;
+                    if (isLabelOverlapY && isLabelOverlapX)
                     {
-                        resultY = avoidCorners[0].y - gap - labelAbovePivot;
-                        bubbleReserve = 0f;
+                        needHalfWidth = halfWidth;
+                    }
+                    bool isBubbleOverlapY = bubbleTop > avoidBottom && labelTop < avoidTop;
+                    bool isBubbleOverlapX = resultX + bubbleHalfWidth > avoidLeft && resultX - bubbleHalfWidth < avoidRight;
+                    if (isBubbleOverlapY && isBubbleOverlapX)
+                    {
+                        needHalfWidth = Mathf.Max(needHalfWidth, bubbleHalfWidth);
+                    }
+
+                    if (needHalfWidth > 0f)
+                    {
+                        float avoidCenterX = (avoidLeft + avoidRight) * 0.5f;
+                        if (resultX >= avoidCenterX)
+                        {
+                            resultX = avoidRight + gap + needHalfWidth;
+                        }
+                        else
+                        {
+                            resultX = avoidLeft - gap - needHalfWidth;
+                        }
                     }
                 }
             }
         }
-        float resultX = Mathf.Clamp(x, halfWidth, Screen.width - halfWidth);
-        return new Vector3(resultX, resultY, 0f);
+        resultX = Mathf.Clamp(resultX, halfWidth, Screen.width - halfWidth);
+        return new Vector3(resultX, y, 0f);
     }
 
     private void HideSeatLabels()

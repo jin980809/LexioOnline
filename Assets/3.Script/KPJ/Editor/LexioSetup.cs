@@ -319,7 +319,12 @@ public class LexioSetup
 
         GameObject eventSystem = new GameObject("EventSystem");
         eventSystem.AddComponent<EventSystem>();
-        eventSystem.AddComponent<InputSystemUIInputModule>();
+        InputSystemUIInputModule inputModule = eventSystem.AddComponent<InputSystemUIInputModule>();
+        // 키보드로 버튼이 눌리지 않게 Submit(Enter) / Move(방향키)를 끔
+        // 켜 두면 마지막에 클릭한 버튼이 선택된 채로 남아 Enter에 다시 눌리고, 방향키로 옆 버튼에 선택이 옮겨감
+        // 마우스 클릭과 입력칸 타이핑에는 영향 없음
+        inputModule.submit = null;
+        inputModule.move = null;
 
         CreateUi(manager, clientView, chipView, ruleBookSprite);
         EditorSceneManager.SaveScene(scene);
@@ -510,18 +515,21 @@ public class LexioSetup
         AddOutline(lastPlayText, new Vector2(1.57f, -1f));
 
         // 하단 줄 (왼쪽부터): 선택 해제 / 문양 정렬 / 숫자 정렬 / 제출 / 패스. 글자가 그려진 이미지 버튼
+        // 한 줄이 같이 움직이도록 모두 화면 아래 가운데 기준 (x는 버튼 가운데 위치). 화면 비율이 바뀌어도 간격 유지
         Vector2 buttonSize = new Vector2(236.7f, 96.8f);
-        Button clearSelectionButton = CreateSpriteButton("ClearSelectionButton", gamePanel, "text/btn_select_clear", "선택 해제", Corner(Vector2.zero, new Vector2(440f, 30f), buttonSize));
-        Button sortSuitButton = CreateSpriteButton("SortSuitButton", gamePanel, "text/btn_sort_suit", "문양 정렬", Corner(Vector2.zero, new Vector2(698.6f, 30f), buttonSize));
-        Button sortNumberButton = CreateSpriteButton("SortNumberButton", gamePanel, "text/btn_sort_number", "숫자 정렬", Corner(Vector2.zero, new Vector2(957.3f, 30f), buttonSize));
-        Button submitButton = CreateSpriteButton("SubmitButton", gamePanel, "text/btn_submit", "제출", Corner(Vector2.zero, new Vector2(1215.9f, 30f), buttonSize));
-        Button passButton = CreateSpriteButton("PassButton", gamePanel, "text/btn_pass", "패스", Corner(Vector2.zero, new Vector2(1474.5f, 30f), buttonSize));
+        Vector2 bottomCenter = new Vector2(0.5f, 0f);
+        Button clearSelectionButton = CreateSpriteButton("ClearSelectionButton", gamePanel, "text/btn_select_clear", "선택 해제", Anchored(bottomCenter, bottomCenter, new Vector2(-401.65f, 30f), buttonSize));
+        Button sortSuitButton = CreateSpriteButton("SortSuitButton", gamePanel, "text/btn_sort_suit", "문양 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(-143.05f, 30f), buttonSize));
+        Button sortNumberButton = CreateSpriteButton("SortNumberButton", gamePanel, "text/btn_sort_number", "숫자 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(115.65f, 30f), buttonSize));
+        Button submitButton = CreateSpriteButton("SubmitButton", gamePanel, "text/btn_submit", "제출", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
+        Button passButton = CreateSpriteButton("PassButton", gamePanel, "text/btn_pass", "패스", Anchored(bottomCenter, bottomCenter, new Vector2(632.85f, 30f), buttonSize));
         // 패 정리 시간에만 켜짐 (그동안 꺼지는 제출 버튼 자리에 같은 크기로 표시)
-        Button readyButton = CreateSpriteButton("ReadyButton", gamePanel, "text/btn_ready", "준비 완료", Corner(Vector2.zero, new Vector2(1215.9f, 30f), buttonSize));
+        Button readyButton = CreateSpriteButton("ReadyButton", gamePanel, "text/btn_ready", "준비 완료", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
         readyButton.gameObject.SetActive(false);
 
         // 패 위 중앙: 선택한 패 정보 (흰 글자 + 검은 외곽선)
-        Text selectionText = CreateGameText("SelectionText", gamePanel, 32, TextAnchor.MiddleCenter, Anchored(new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 395f), new Vector2(700f, 50f)), false);
+        // 3D 손패 위치를 따라가도록 화면 가운데 기준 (3D 오브젝트는 화면 높이에 비례해 가운데 기준으로 움직임)
+        Text selectionText = CreateGameText("SelectionText", gamePanel, 32, TextAnchor.MiddleCenter, Anchored(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0f), new Vector2(0f, -145f), new Vector2(700f, 50f)), false);
         selectionText.color = Color.white;
         AddOutline(selectionText, new Vector2(1f, -3f));
         AddOutline(selectionText, new Vector2(0.73f, -1f));
@@ -726,8 +734,8 @@ public class LexioSetup
         SetReference(ui, "exitButton", exitButton);
 
         // 알림 (항상 맨 위). 대기실 알림("N명 이상 모여야...")도 보이도록 게임 화면 밖에 둠
-        // 손패를 가리지 않도록 가운데 패와 맞은편 상대 패 사이에 표시
-        Text noticeText = CreateGameText("NoticeText", root, 36, TextAnchor.MiddleCenter, Corner(new Vector2(0.5f, 1f), new Vector2(0f, -398f), new Vector2(1200f, 60f)), false);
+        // 손패를 가리지 않도록 가운데 패와 맞은편 상대 패 사이에 표시 (3D 패 위치를 따라가도록 화면 가운데 기준)
+        Text noticeText = CreateGameText("NoticeText", root, 36, TextAnchor.MiddleCenter, Anchored(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 1f), new Vector2(0f, 142f), new Vector2(1200f, 60f)), false);
         SetReference(ui, "noticeText", noticeText);
 
         lobbyPanel.gameObject.SetActive(false);
