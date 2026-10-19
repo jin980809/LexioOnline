@@ -43,12 +43,18 @@ public class LoginNetworkBehaviour : NetworkBehaviour
         
         // 실제 DB 접근은 서버에서만 실행
         bool success = serverDBManager.Login(_id, _pw, out userInfo);
+        
+        // 정보전달 확인용(추후 제거)
+        Debug.Log($"[Server] DB 로그인 결과: {success}, " +$"UserInfo null 여부: {userInfo == null}");
 
         if (!success || userInfo == null)
         {
             LoginTargetAuthResult(connectionToClient, false, "아이디 또는 비밀번호가 올바르지 않습니다.", null);
             return;
         }
+
+        // 정보전달 확인용(추후 제거)
+        Debug.Log($"[Server] RPC 전송 직전: " +$"ID={userInfo.userID}, Name={userInfo.userName}");
 
         LoginTargetAuthResult(connectionToClient, true, "로그인 성공", userInfo);
     }
@@ -172,6 +178,9 @@ public class LoginNetworkBehaviour : NetworkBehaviour
     private void LoginTargetAuthResult(NetworkConnectionToClient target, bool success, string message, UserInfo userinfo)
     {
         // 이 메서드는 클라이언트에서 실행됩니다.
+
+        // 정보전달 확인용(추후 제거)
+        Debug.Log($"[Client] TargetRpc 수신: success={success}, " + $"UserInfo null 여부={userinfo == null}");
 
         loginOnAuthResult?.Invoke(success, message, userinfo);
         Debug.Log(message);

@@ -4,16 +4,16 @@ using System;
 [Serializable]
 public class UserInfo
 {
-    public string userID { get; private set; } //유저 아이디
-    public string userPW { get; private set; } //유저 비밀번호
-    public string userName { get; private set; } //유저 이름
-    public int imageNum { get; private set; } //프로필 이미지
-    public float first { get; private set; } //1등 횟수
-    public float second { get; private set; } //2등 횟수
-    public float third { get; private set; } //3등 횟수
-    public float fourth { get; private set; } //4등 횟수
-    public float playNum { get; private set; } //판수
-    public float averageRank { get; private set; } //평균 등수
+    public string userID;//유저 아이디
+    public string userPW;//유저 비밀번호
+    public string userName;//유저 이름
+    public int imageNum; //프로필 이미지
+    public float first;//1등 횟수
+    public float second; //2등 횟수
+    public float third;//3등 횟수
+    public float fourth; //4등 횟수
+    public float playNum; //판수
+    public float averageRank; //평균 등수
 
     public UserInfo() { }
     public UserInfo(string _id, string _pwd, string _name, int _imageNum, float _first, float _second, float _third, float _fourth, float _playNum, float _averageRank)

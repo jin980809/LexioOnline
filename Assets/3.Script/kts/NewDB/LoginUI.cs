@@ -71,15 +71,31 @@ public class LoginUI : MonoBehaviour
     {
         loginResultText.text = message;
 
-        if (success)
+        if (!success)
         {
-            PlayerDBManager.instance.UserInfoUpDate(userinfo);
-            Debug.Log("요청 성공");
+            Debug.LogWarning("[Client] 로그인 실패: " + message);
+            return;
         }
-        else
+
+        if (userinfo == null)
         {
-            Debug.LogWarning("요청 실패");
+            Debug.LogError(
+                "[Client] 로그인은 성공했지만 UserInfo가 null입니다."
+            );
+            loginResultText.text = "사용자 정보를 받아오지 못했습니다.";
+            return;
         }
+
+        if (PlayerDBManager.instance == null)
+        {
+            Debug.LogError(
+                "[Client] PlayerDBManager 인스턴스가 없습니다."
+            );
+            loginResultText.text = "사용자 정보 저장소가 없습니다.";
+            return;
+        }
+
+        PlayerDBManager.instance.UserInfoUpDate(userinfo);
     }
 
     private void OnDestroy()
