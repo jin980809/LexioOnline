@@ -259,6 +259,7 @@ GameObject:
   - component: {fileID: 298274120}
   - component: {fileID: 298274118}
   - component: {fileID: 298274123}
+  - component: {fileID: 298274124}
   m_Layer: 0
   m_Name: NetworkRoot
   m_TagString: Untagged
@@ -354,7 +355,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LexioNetworkManager
   dontDestroyOnLoad: 1
   runInBackground: 1
-  headlessStartMode: 0
+  headlessStartMode: 1
   editorAutoStart: 0
   sendRate: 60
   offlineScene: 
@@ -365,7 +366,7 @@ MonoBehaviour:
   maxConnections: 100
   disconnectInactiveConnections: 0
   disconnectInactiveTimeout: 60
-  authenticator: {fileID: 0}
+  authenticator: {fileID: 298274124}
   playerPrefab: {fileID: 7141768817178057225, guid: 394d8355f4064fc4b9262a8b5d189dff, type: 3}
   autoCreatePlayer: 0
   playerSpawnMethod: 0
@@ -391,6 +392,25 @@ MonoBehaviour:
   maxMatches: 20
   matchTablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   autoJoinMatchSize: 0
+--- !u!114 &298274124
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 298274117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdc59e1a6e3f9fd479ad4eba7aff81fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NYMAccountAuthenticator
+  OnServerAuthenticated:
+    m_PersistentCalls:
+      m_Calls: []
+  OnClientAuthenticated:
+    m_PersistentCalls:
+      m_Calls: []
+  databaseConfigPath: 
 --- !u!1 &1974479711
 GameObject:
   m_ObjectHideFlags: 0

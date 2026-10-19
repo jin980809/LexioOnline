@@ -6,7 +6,7 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 3;
     public const int RuleVersion = 1;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.
@@ -51,7 +51,31 @@ public enum AccountResultCode
     InvalidNickname,
     DuplicateLoginId,
     AlreadyLoggedIn,
-    ServiceUnavailable  // DB 미준비·오류. 절대 성공으로 처리하지 않는다
+    ServiceUnavailable, // DB 미준비·오류. 절대 성공으로 처리하지 않는다
+    DuplicateNickname,
+    InvalidProfile
+}
+
+public enum AccountOperation { Login, CheckId, Register, ChangePassword, DeleteAccount, UpdateProfile }
+
+public struct AccountActionRequest : NetworkMessage
+{
+    public int requestId;
+    public int protocolVersion;
+    public AccountOperation operation;
+    public string loginId;
+    public string password;
+    public string newPassword;
+    public string nickname;
+    public int profileImage;
+}
+
+public struct AccountActionResult : NetworkMessage
+{
+    public int requestId;
+    public AccountOperation operation;
+    public AccountResultCode code;
+    public PlayerProfile profile;
 }
 
 public enum RejectReason
@@ -107,6 +131,7 @@ public struct PlayerProfile
 {
     public string userId; // 계정 키 = 소문자로 정규화한 로그인 아이디 (DB user_id PK, 통합작업명세 v2.1)
     public string nickname;
+    public int profileImage;
     public int wins;
     public int losses;
     public int gamesPlayed;
@@ -166,6 +191,8 @@ public struct QueueUpdated : NetworkMessage
 {
     public int matchSize;
     public int waitingCount;
+    public string[] nicknames; // 본인 먼저, 같은 매칭 그룹의 서버 인증 DB 닉네임만 공개
+    public int[] profileImages;
 }
 
 public struct MatchFound

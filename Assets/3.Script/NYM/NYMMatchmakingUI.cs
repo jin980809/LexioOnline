@@ -2,7 +2,7 @@ using Mirror;
 using UnityEngine;
 using UnityEngine.UI;
 
-// NYM 테스트 씬 전용 임시 UI. 팀원 UI/서버 원본과 큐 규약은 변경하지 않는다.
+// NYM 통합 씬의 DB 로그인·매칭 표시. 팀원 UI/서버 원본은 변경하지 않는다.
 public class NYMMatchmakingUI : MonoBehaviour
 {
     [Header("매칭 연결")]
@@ -24,8 +24,35 @@ public class NYMMatchmakingUI : MonoBehaviour
     [SerializeField] GameObject queuePanel;
     [SerializeField] Text queueText;
     [SerializeField] Text queueCountText;
-    [SerializeField] RectTransform spinner;
+    [Tooltip("왼쪽부터 타일4개. 회전 없이 순차 상하 이동")]
+    [SerializeField] RectTransform[] loadingTiles = new RectTransform[0];
     [SerializeField] Button cancelButton;
+    [SerializeField] Text queueTimerText;
+    [Tooltip("Slot0~4 순서. 선택 인원만 가운데 정렬해 표시")]
+    [SerializeField] RectTransform[] queueSlots = new RectTransform[0];
+    [SerializeField] Sprite emptySlotSprite;
+    [SerializeField] Sprite joinedSlotSprite;
+    [SerializeField] Sprite[] avatarSprites = new Sprite[0];
+    [SerializeField] Image[] profileAvatars = new Image[0];
+
+    [Header("팝업과 배경")]
+    [SerializeField] CanvasGroup menuGroup;
+    [SerializeField] GameObject[] popupPanels = new GameObject[0];
+    [SerializeField] GameObject popupLogo;
+    [SerializeField] RuleBookPanel guideDrawer;
+    [Tooltip("프런트 화면에서 숨기고 실제 경기에서 표시할 테이블/배경")]
+    [SerializeField] GameObject[] gameEnvironment = new GameObject[0];
+
+    [Header("DB 로그인")]
+    [SerializeField] NYMAccountAuthenticator accountAuthenticator;
+    [SerializeField] GameObject loginPage;
+    [SerializeField] CanvasGroup loginGroup;
+    [SerializeField] GameObject mainPage;
+    [SerializeField] InputField loginIdInput;
+    [SerializeField] InputField loginPasswordInput;
+    [SerializeField] Button loginButton;
+    [SerializeField] Button logoutButton;
+    [SerializeField] Text accountText;
 
     bool choosing;
     bool joinSent;
@@ -34,14 +61,24 @@ public class NYMMatchmakingUI : MonoBehaviour
     bool manualDisconnect;
     int matchSize;
     int shownSeconds = -1;
+    int waitingCount;
     float queueStartedAt;
     string message = "";
+    string[] waitingNicknames = new string[0];
+    int[] waitingProfiles = new int[0];
+    Vector2[] loadingTilePositions;
+    bool authRejected;
 
     void OnEnable()
     {
         networkManager.QueueUpdatedReceived += OnQueueUpdated;
         networkManager.QueueResultReceived += OnQueueResult;
         networkManager.ClientDisconnected += OnDisconnected;
+        if (accountAuthenticator != null)
+        {
+            accountAuthenticator.ResultReceived += OnLoginResult;
+            accountAuthenticator.ProfileChanged += ApplyProfile;
+        }
     }
 
     void OnDisable()
@@ -50,6 +87,11 @@ public class NYMMatchmakingUI : MonoBehaviour
         networkManager.QueueUpdatedReceived -= OnQueueUpdated;
         networkManager.QueueResultReceived -= OnQueueResult;
         networkManager.ClientDisconnected -= OnDisconnected;
+        if (accountAuthenticator != null)
+        {
+            accountAuthenticator.ResultReceived -= OnLoginResult;
+            accountAuthenticator.ProfileChanged -= ApplyProfile;
+        }
     }
 
     void Start()
@@ -61,21 +103,111 @@ public class NYMMatchmakingUI : MonoBehaviour
         fiveButton.onClick.AddListener(() => Join(5));
         backButton.onClick.AddListener(Back);
         cancelButton.onClick.AddListener(Cancel);
+        loadingTilePositions = new Vector2[loadingTiles.Length];
+        for (int i = 0; i < loadingTiles.Length; i++) loadingTilePositions[i] = loadingTiles[i].anchoredPosition;
+        if (accountAuthenticator != null)
+        {
+            loginButton.onClick.AddListener(Login);
+            logoutButton.onClick.AddListener(Logout);
+            nicknameInput.readOnly = true;
+        }
+    }
+
+    void Login()
+    {
+        if (NetworkClient.active) return;
+        if (string.IsNullOrWhiteSpace(loginIdInput.text) || string.IsNullOrEmpty(loginPasswordInput.text))
+        {
+            message = "아이디와 비밀번호를 입력하세요.";
+            return;
+        }
+        authRejected = false;
+        accountAuthenticator.SetCredentials(loginIdInput.text, loginPasswordInput.text);
+        loginPasswordInput.text = "";
+        message = "로그인 중...";
+        networkManager.StartClient();
+    }
+
+    void OnLoginResult(AccountResultMessage result)
+    {
+        authRejected = result.code != AccountResultCode.Success;
+        if (!authRejected)
+        {
+            ApplyProfile(result.profile);
+            message = "";
+        }
+        else
+        {
+            message = result.code == AccountResultCode.ServiceUnavailable ? "서버 DB 연결을 확인하세요."
+                : result.code == AccountResultCode.VersionMismatch ? "서버·클라이언트 버전을 맞춰주세요."
+                : result.code == AccountResultCode.AlreadyLoggedIn ? "이미 접속 중인 계정입니다."
+                : "로그인 정보를 확인하세요.";
+        }
+    }
+
+    public void SetStatus(string text) => message = text;
+
+    void ApplyProfile(PlayerProfile profile)
+    {
+        nicknameInput.text = profile.nickname;
+        networkManager.PendingNickname = profile.nickname;
+        networkManager.PendingProfileImage = profile.profileImage;
+        accountText.text = profile.userId;
+        foreach (Image image in profileAvatars) if (image != null) image.sprite = Avatar(profile.profileImage);
+        var window = accountText.transform.parent;
+        window.Find("TotalGamesStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed + "판";
+        window.Find("FirstPlaceStat/ValueText").GetComponent<Text>().text = profile.wins + "회";
+        window.Find("FirstRateStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed == 0 ? "—" : Mathf.RoundToInt(profile.wins * 100f / profile.gamesPlayed) + "%";
+    }
+
+    Sprite Avatar(int index) => index >= 0 && index < avatarSprites.Length ? avatarSprites[index] : joinedSlotSprite;
+
+    public void Logout()
+    {
+        foreach (GameObject panel in popupPanels) if (panel != null) panel.SetActive(false);
+        choosing = false;
+        manualDisconnect = true;
+        networkManager.StopClient();
+        ResetRequest();
     }
 
     void LateUpdate()
     {
+        if (accountAuthenticator != null)
+        {
+            bool loggedIn = NetworkClient.isConnected && NetworkClient.connection != null && NetworkClient.connection.isAuthenticated;
+            loginPage.SetActive(!loggedIn);
+            mainPage.SetActive(loggedIn);
+            loginButton.interactable = !NetworkClient.active;
+        }
         bool inMatch = NetworkClient.isConnected && networkManager.Table != null && networkManager.LocalPlayer != null;
         if (inMatch)
         {
             choosing = false;
-            ResetRequest();
+            if (matchSize != 0) ResetRequest();
         }
         nicknameInput.gameObject.SetActive(!choosing && !inMatch);
         connectButton.gameObject.SetActive(!choosing && !inMatch);
         modePanel.SetActive(choosing && matchSize == 0 && !inMatch);
         queuePanel.SetActive(matchSize != 0 && !inMatch);
-        statusText.text = message;
+        statusText.text = message.Length == 0 ? (accountAuthenticator == null ? "게스트 테스트 · v0.1.0" : "DB 계정 로그인 · v0.1.0") : message;
+
+        bool popupOpen = guideDrawer != null && guideDrawer.IsOpen;
+        foreach (GameObject panel in popupPanels)
+            if (panel != null && panel.activeInHierarchy) popupOpen = true;
+        if (menuGroup != null)
+        {
+            menuGroup.alpha = popupOpen ? 0f : 1f;
+            menuGroup.interactable = menuGroup.blocksRaycasts = !popupOpen;
+        }
+        if (loginGroup != null)
+        {
+            loginGroup.alpha = popupOpen ? 0f : 1f;
+            loginGroup.interactable = loginGroup.blocksRaycasts = !popupOpen;
+        }
+        if (popupLogo != null) popupLogo.SetActive(popupOpen && !inMatch);
+        foreach (GameObject item in gameEnvironment)
+            if (item != null) item.SetActive(inMatch);
 
         if (matchSize == 0 || inMatch) return;
         if (NetworkClient.isConnected && !joinSent)
@@ -84,19 +216,42 @@ public class NYMMatchmakingUI : MonoBehaviour
             networkManager.ClientJoinQueue(matchSize);
         }
         cancelButton.interactable = !cancelPending;
-        spinner.Rotate(0f, 0f, -240f * Time.unscaledDeltaTime);
+        for (int i = 0; i < loadingTiles.Length; i++)
+            loadingTiles[i].anchoredPosition = loadingTilePositions[i] + Vector2.up * (Mathf.Sin(Time.unscaledTime * 4f - i * 0.8f) * 16f);
         int seconds = queued ? Mathf.Max(0, Mathf.FloorToInt(Time.unscaledTime - queueStartedAt)) : 0;
         if (seconds != shownSeconds)
         {
             shownSeconds = seconds;
-            queueText.text = queued
-                ? string.Format("[ {0}인 매칭중 {1:00}:{2:00} ]", matchSize, seconds / 60, seconds % 60)
-                : string.Format("[ {0}인 접속 중 00:00 ]", matchSize);
+            queueText.text = string.Format("{0}인 게임 · {1}", matchSize, queued ? "상대를 찾고 있어요" : "서버 연결 중");
+            if (queueTimerText != null)
+                queueTimerText.text = string.Format("{0:00}:{1:00}", seconds / 60, seconds % 60);
         }
+    }
+
+    void RefreshSlots()
+    {
+        for (int i = 0; i < queueSlots.Length; i++)
+        {
+            RectTransform slot = queueSlots[i];
+            if (slot == null) continue;
+            slot.gameObject.SetActive(i < matchSize);
+            if (i >= matchSize) continue;
+            slot.anchoredPosition = new Vector2((i - (matchSize - 1) * 0.5f) * 156f, 0f);
+            bool occupied = queued && i < waitingCount;
+            slot.Find("Avatar").GetComponent<Image>().sprite = occupied ? Avatar(i < waitingProfiles.Length ? waitingProfiles[i] : 0) : emptySlotSprite;
+            Text label = slot.Find("NameText").GetComponent<Text>();
+            label.supportRichText = false;
+            label.text = occupied ? (i < waitingNicknames.Length ? waitingNicknames[i] : "입장 중") : "대기 중";
+            label.color = occupied ? new Color32(35, 21, 54, 255) : new Color32(189, 181, 211, 255);
+            Transform meTag = slot.Find("MeTag");
+            if (meTag != null) meTag.gameObject.SetActive(occupied && i == 0);
+        }
+        queueCountText.text = matchSize == 0 ? "" : string.Format("<color=#231536>{0}</color> / {1}명 모였어요", waitingCount, matchSize);
     }
 
     void ShowModes()
     {
+        if (accountAuthenticator != null && (!NetworkClient.isConnected || !NetworkClient.connection.isAuthenticated)) return;
         string nickname = nicknameInput.text.Trim();
         if (nickname.Length == 0 || nickname.Length > LexioPlayer.MaxNicknameLength)
         {
@@ -124,7 +279,8 @@ public class NYMMatchmakingUI : MonoBehaviour
         matchSize = size;
         joinSent = queued = cancelPending = false;
         shownSeconds = -1;
-        queueCountText.text = "서버에 연결하고 있습니다.";
+        waitingCount = 0;
+        RefreshSlots();
         message = "";
         if (!NetworkClient.active) networkManager.StartClient();
     }
@@ -140,8 +296,11 @@ public class NYMMatchmakingUI : MonoBehaviour
     void OnQueueUpdated(QueueUpdated update)
     {
         if (update.matchSize != matchSize || matchSize == 0) return;
+        waitingCount = Mathf.Clamp(update.waitingCount, 0, matchSize);
+        waitingNicknames = update.nicknames ?? new string[0];
+        waitingProfiles = update.profileImages ?? new int[0];
         BeginTimer();
-        queueCountText.text = "대기 " + update.waitingCount + "명";
+        RefreshSlots();
     }
 
     void OnQueueResult(RequestResult result)
@@ -192,8 +351,11 @@ public class NYMMatchmakingUI : MonoBehaviour
     void Back()
     {
         choosing = false;
-        manualDisconnect = true;
-        if (NetworkClient.active) networkManager.StopClient();
+        if (accountAuthenticator == null)
+        {
+            manualDisconnect = true;
+            if (NetworkClient.active) networkManager.StopClient();
+        }
         ResetRequest();
         message = "";
     }
@@ -201,8 +363,9 @@ public class NYMMatchmakingUI : MonoBehaviour
     void OnDisconnected()
     {
         ResetRequest();
+        if (accountAuthenticator != null && accountAuthenticator.TemporaryConnection) return;
         if (!manualDisconnect) choosing = false;
-        message = manualDisconnect ? "" : "서버 연결이 종료되었습니다. 서버 상태를 확인하세요.";
+        if (!authRejected) message = manualDisconnect ? "" : "서버 연결이 종료되었습니다. 서버 상태를 확인하세요.";
         manualDisconnect = false;
     }
 
@@ -211,5 +374,9 @@ public class NYMMatchmakingUI : MonoBehaviour
         matchSize = 0;
         joinSent = queued = cancelPending = false;
         shownSeconds = -1;
+        waitingCount = 0;
+        waitingNicknames = new string[0];
+        waitingProfiles = new int[0];
+        RefreshSlots();
     }
 }

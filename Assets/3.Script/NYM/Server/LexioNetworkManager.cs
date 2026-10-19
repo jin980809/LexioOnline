@@ -55,6 +55,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
     // shortcut: Authenticator가 없으면 연결 ID를 임시 계정 키로 쓴다. DB 로그인(GPT-20261012-03) 후 Authenticator를 붙이면 자동으로 로그인 필수가 된다.
     public string GetAccountKey(NetworkConnectionToClient conn)
     {
+        if (conn.authenticationData is PlayerProfile profile) return string.IsNullOrEmpty(profile.userId) ? null : profile.userId;
         if (conn.authenticationData is string accountKey) return accountKey;
         return authenticator == null ? "guest:" + conn.connectionId : null;
     }
@@ -71,7 +72,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
     [Server]
     public RejectReason JoinQueue(NetworkConnectionToClient conn, QueueJoinRequest request)
     {
-        if (GetAccountKey(conn) == null) return RejectReason.NotLoggedIn;
+        if (!conn.isAuthenticated || GetAccountKey(conn) == null) return RejectReason.NotLoggedIn;
         if (!LexioProtocol.IsValidMatchSize(request.matchSize)) return RejectReason.InvalidMatchSize;
         if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
         if (queuedSize.ContainsKey(conn)) return RejectReason.AlreadyQueued; // 모드 변경은 취소 후 신청
@@ -144,9 +145,31 @@ public class LexioNetworkManager : LexioTableNetworkManager
 
     void SendQueueUpdated(int matchSize)
     {
-        QueueUpdated message = new QueueUpdated { matchSize = matchSize, waitingCount = queues[matchSize].Count };
-        foreach (NetworkConnectionToClient waiter in queues[matchSize])
-            waiter.Send(message);
+        List<NetworkConnectionToClient> queue = queues[matchSize];
+        for (int i = 0; i < queue.Count; i++)
+        {
+            int first = i / matchSize * matchSize;
+            int count = Math.Min(matchSize, queue.Count - first);
+            string[] nicknames = new string[count];
+            int[] profileImages = new int[count];
+            nicknames[0] = QueueNickname(queue[i]);
+            profileImages[0] = QueueProfileImage(queue[i]);
+            int index = 1;
+            for (int j = first; j < first + count; j++)
+                if (j != i) { nicknames[index] = QueueNickname(queue[j]); profileImages[index++] = QueueProfileImage(queue[j]); }
+            queue[i].Send(new QueueUpdated { matchSize = matchSize, waitingCount = count, nicknames = nicknames, profileImages = profileImages });
+        }
+    }
+
+    static string QueueNickname(NetworkConnectionToClient conn) =>
+        conn.authenticationData is PlayerProfile profile ? profile.nickname : "게스트";
+
+    static int QueueProfileImage(NetworkConnectionToClient conn) =>
+        conn.authenticationData is PlayerProfile profile ? profile.profileImage : 0;
+
+    public void RefreshQueueProfile(NetworkConnectionToClient conn)
+    {
+        if (queuedSize.TryGetValue(conn, out int size)) SendQueueUpdated(size);
     }
 
     // 먼저 신청한 순서대로 정원만큼 한 번에 꺼내 경기 시작. 모드끼리 섞지 않는다.
@@ -344,6 +367,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
     /// <param name="conn">Connection from client.</param>
     public override void OnServerDisconnect(NetworkConnectionToClient conn)
     {
+        if (conn == null) return; // 호스트 시작 실패 후 Mirror 정리 콜백
         RemoveFromQueue(conn);
 
         // 재접속 없음: 좌석은 비워 두고(null) 소속만 끊는다. 남은 판은 KPJ 테이블이 AI로 진행.
