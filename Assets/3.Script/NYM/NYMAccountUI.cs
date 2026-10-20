@@ -11,6 +11,8 @@ public class NYMAccountUI : MonoBehaviour
     [SerializeField] NYMAccountAuthenticator account;
     [SerializeField] NYMMatchmakingUI matchmaking;
     [SerializeField] GameObject settingsPopup;
+    [Tooltip("메인 나가기 버튼이 띄울 종료 확인 팝업. 비우면 바로 종료 (2026-10-20 KPJ 요청·사용자 승인)")]
+    [SerializeField] GameObject quitConfirmPopup;
 
     InputField signupId, signupNickname, signupPassword, signupConfirm;
     InputField changeId, currentPassword, newPassword, newConfirm, deleteId, deletePassword, editNickname;
@@ -104,16 +106,20 @@ public class NYMAccountUI : MonoBehaviour
         if (saveId.isOn) Get<InputField>("LoginPage/LoginPanel/IdInput").text = PlayerPrefs.GetString("NYM_LoginId");
         saveId.onValueChanged.AddListener(value => { if (!value) PlayerPrefs.DeleteKey("NYM_LoginId"); });
 
-        Get<Button>("MainPage/SettingsButton").onClick.AddListener(() => settingsPopup.SetActive(true));
-        foreach (Button button in GetComponentsInChildren<Button>(true))
-            if (button.name == "SettingsButton") button.onClick.AddListener(() => settingsPopup.SetActive(true));
-        Get<Button>("MainPage/Menu/ExitButton").onClick.AddListener(Quit);
-        settingsPopup.transform.Find("Window/CloseButton").GetComponent<Button>().onClick.AddListener(() => settingsPopup.SetActive(false));
-        var volume = settingsPopup.transform.Find("Window/VolumeSlider").GetComponent<Slider>();
-        volume.SetValueWithoutNotify(PlayerPrefs.GetFloat("NYM_Volume", 1f));
-        AudioListener.volume = volume.value;
-        volume.onValueChanged.AddListener(value => { AudioListener.volume = value; PlayerPrefs.SetFloat("NYM_Volume", value); VolumeLabel(value); });
-        VolumeLabel(volume.value);
+        Get<Button>("MainPage/Menu/ExitButton").onClick.AddListener(() => { if (quitConfirmPopup != null) quitConfirmPopup.SetActive(true); else Quit(); });
+        // KPJ 통합 씬(GameClient)은 설정 팝업을 KPJ SettingsPanel이 맡으므로 비워 둔다 (2026-10-20 KPJ 요청)
+        if (settingsPopup != null)
+        {
+            Get<Button>("MainPage/SettingsButton").onClick.AddListener(() => settingsPopup.SetActive(true));
+            foreach (Button button in GetComponentsInChildren<Button>(true))
+                if (button.name == "SettingsButton") button.onClick.AddListener(() => settingsPopup.SetActive(true));
+            settingsPopup.transform.Find("Window/CloseButton").GetComponent<Button>().onClick.AddListener(() => settingsPopup.SetActive(false));
+            var volume = settingsPopup.transform.Find("Window/VolumeSlider").GetComponent<Slider>();
+            volume.SetValueWithoutNotify(PlayerPrefs.GetFloat("NYM_Volume", 1f));
+            AudioListener.volume = volume.value;
+            volume.onValueChanged.AddListener(value => { AudioListener.volume = value; PlayerPrefs.SetFloat("NYM_Volume", value); VolumeLabel(value); });
+            VolumeLabel(volume.value);
+        }
 
         string[] tabs = { "AllTab", "Tab3P", "Tab4P", "Tab5P" };
         for (int i = 0; i < tabs.Length; i++) { int index = i; Get<Button>("HistoryPopup/Window/Tabs/" + tabs[i]).onClick.AddListener(() => HistoryTab(index)); }

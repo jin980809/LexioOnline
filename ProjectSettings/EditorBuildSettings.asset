@@ -6,6 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/1.Scene/KPJ/GameClient.unity
+    guid: fda1dbb76e18bb54f93d9c8c8fdfa76e
+  - enabled: 1
+    path: Assets/1.Scene/KPJ/GameServer.unity
+    guid: a566878a8f29cbe46981e7aa1b27d438
+  - enabled: 1
     path: Assets/1.Scene/NYM_Client_Scene.unity
     guid: d9b5001068354c94688633752ca075d0
   - enabled: 0

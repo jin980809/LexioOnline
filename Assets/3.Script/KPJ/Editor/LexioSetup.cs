@@ -87,7 +87,7 @@ public class LexioSetup
     public static void BuildServer()
     {
         BuildPlayerOptions options = new BuildPlayerOptions();
-        options.scenes = new string[] { ServerScenePath };
+        options.scenes = new string[] { GameSceneBuilder.ServerScenePath };
         options.locationPathName = "Builds/Server/LexioServer.exe";
         options.target = BuildTarget.StandaloneWindows64;
         options.subtarget = (int)StandaloneBuildSubtarget.Server;
@@ -98,7 +98,7 @@ public class LexioSetup
     public static void BuildClient()
     {
         BuildPlayerOptions options = new BuildPlayerOptions();
-        options.scenes = new string[] { ClientScenePath };
+        options.scenes = new string[] { GameSceneBuilder.ClientScenePath };
         options.locationPathName = "Builds/Client/LexioClient.exe";
         options.target = BuildTarget.StandaloneWindows64;
         options.subtarget = (int)StandaloneBuildSubtarget.Player;

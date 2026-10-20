@@ -33,12 +33,15 @@ public class LexioUI : MonoBehaviour
     [SerializeField] private ChipFlightView chipView;
 
     [Header("Connect")]
+    // 게임 밖에서 보이는 화면. 통합 씬에서는 로그인~메인 화면 전체
     [SerializeField] private GameObject connectPanel;
+    // 아래 셋은 닉네임만으로 접속하는 테스트 씬용. 로그인으로 접속하는 씬에서는 비워 둠
     [SerializeField] private InputField nicknameInput;
     [SerializeField] private Button connectButton;
     [SerializeField] private Text connectStatusText;
 
     [Header("Lobby")]
+    // 시작 버튼을 눌러 게임을 여는 대기실. 정원이 차면 서버가 바로 시작하는 씬에서는 비워 둠
     [SerializeField] private GameObject lobbyPanel;
     [SerializeField] private Text lobbyPlayersText;
     [SerializeField] private Button startButton;
@@ -127,6 +130,8 @@ public class LexioUI : MonoBehaviour
     [SerializeField] private ResultPanelView resultView;
     [SerializeField] private Text resultText;
     [SerializeField] private Button exitButton;
+    [Tooltip("체크하면 나가기 버튼이 접속을 끊지 않고 메인 화면으로 돌아감 (로그인 접속 씬용)")]
+    [SerializeField] private bool exitToMenu;
 
     [Header("Common")]
     [SerializeField] private Text noticeText;
@@ -196,8 +201,14 @@ public class LexioUI : MonoBehaviour
 
     private void Start()
     {
-        connectButton.onClick.AddListener(OnConnectClicked);
-        startButton.onClick.AddListener(OnStartClicked);
+        if (connectButton != null)
+        {
+            connectButton.onClick.AddListener(OnConnectClicked);
+        }
+        if (startButton != null)
+        {
+            startButton.onClick.AddListener(OnStartClicked);
+        }
         submitButton.onClick.AddListener(OnSubmitClicked);
         passButton.onClick.AddListener(OnPassClicked);
         // Setup을 다시 돌리기 전 씬(팀원 씬 포함)에는 이 버튼이 없을 수 있음
@@ -209,11 +220,14 @@ public class LexioUI : MonoBehaviour
         sortNumberButton.onClick.AddListener(OnSortNumberClicked);
         readyButton.onClick.AddListener(OnReadyClicked);
         exitButton.onClick.AddListener(OnExitClicked);
-        nicknameInput.characterLimit = LexioPlayer.MaxNicknameLength;
+        if (nicknameInput != null)
+        {
+            nicknameInput.characterLimit = LexioPlayer.MaxNicknameLength;
+        }
         submitGroup = GetOrAddCanvasGroup(submitButton);
         passGroup = GetOrAddCanvasGroup(passButton);
         defaultSelectionColor = selectionText.color;
-        connectStatusText.text = "";
+        SetConnectStatus("");
         noticeText.text = "";
 
         // 표시 전용 (플레이어가 끌어서 바꾸지 못하게)
@@ -265,14 +279,17 @@ public class LexioUI : MonoBehaviour
         SetActive(gamePanel, showGame);
         SetActive(resultPanel, showResult);
 
-        if (showConnect)
+        if (showConnect && connectButton != null)
         {
             connectButton.interactable = NetworkClient.active == false;
         }
 
         if (showLobby)
         {
-            startButton.interactable = isStartRequested == false;
+            if (startButton != null)
+            {
+                startButton.interactable = isStartRequested == false;
+            }
         }
         else
         {
@@ -354,12 +371,12 @@ public class LexioUI : MonoBehaviour
             networkManager.PendingNickname = nickname;
             isExitRequested = false;
             hasJoined = false;
-            connectStatusText.text = "접속 중... (" + networkManager.networkAddress + ")";
+            SetConnectStatus("접속 중... (" + networkManager.networkAddress + ")");
             networkManager.StartClient();
         }
         else
         {
-            connectStatusText.text = "닉네임을 입력하세요.";
+            SetConnectStatus("닉네임을 입력하세요.");
         }
     }
 
@@ -367,15 +384,15 @@ public class LexioUI : MonoBehaviour
     {
         if (isExitRequested)
         {
-            connectStatusText.text = "";
+            SetConnectStatus("");
         }
         else if (hasJoined)
         {
-            connectStatusText.text = "서버와 연결이 끊어졌습니다.";
+            SetConnectStatus("서버와 연결이 끊어졌습니다.");
         }
         else
         {
-            connectStatusText.text = "접속할 수 없습니다. (서버 꺼짐 / 게임 진행 중 / 인원 초과)";
+            SetConnectStatus("접속할 수 없습니다. (서버 꺼짐 / 게임 진행 중 / 인원 초과)");
         }
         hasJoined = false;
         isStartRequested = false;
@@ -386,13 +403,16 @@ public class LexioUI : MonoBehaviour
 
     private void RefreshLobby(LexioTable table)
     {
-        builder.Clear();
-        builder.Append("대기 중 (").Append(table.Seats.Count).Append(" / ").Append(GameRules.MaxPlayers).Append(")\n\n");
-        for (int i = 0; i < table.Seats.Count; i++)
+        if (lobbyPlayersText != null)
         {
-            builder.Append(i + 1).Append(". ").Append(nicknameFitter.Shorten(table.Seats[i].nickname)).Append('\n');
+            builder.Clear();
+            builder.Append("대기 중 (").Append(table.Seats.Count).Append(" / ").Append(GameRules.MaxPlayers).Append(")\n\n");
+            for (int i = 0; i < table.Seats.Count; i++)
+            {
+                builder.Append(i + 1).Append(". ").Append(nicknameFitter.Shorten(table.Seats[i].nickname)).Append('\n');
+            }
+            lobbyPlayersText.text = builder.ToString();
         }
-        lobbyPlayersText.text = builder.ToString();
     }
 
     private void OnStartClicked()
@@ -1221,8 +1241,23 @@ public class LexioUI : MonoBehaviour
 
     private void OnExitClicked()
     {
-        isExitRequested = true;
-        networkManager.StopClient();
+        if (exitToMenu)
+        {
+            networkManager.DismissFinishedTable();
+        }
+        else
+        {
+            isExitRequested = true;
+            networkManager.StopClient();
+        }
+    }
+
+    private void SetConnectStatus(string message)
+    {
+        if (connectStatusText != null)
+        {
+            connectStatusText.text = message;
+        }
     }
 
     // ---------------- 공통 ----------------
@@ -1279,9 +1314,10 @@ public class LexioUI : MonoBehaviour
         return nickname;
     }
 
+    // 비워 둔 패널(씬에 없는 패널)은 건너뜀
     private void SetActive(GameObject target, bool isActive)
     {
-        if (target.activeSelf != isActive)
+        if (target != null && target.activeSelf != isActive)
         {
             target.SetActive(isActive);
         }

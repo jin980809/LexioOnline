@@ -19,6 +19,13 @@ public class NYMMatchmakingUI : MonoBehaviour
     [SerializeField] Button fourButton;
     [SerializeField] Button fiveButton;
     [SerializeField] Button backButton;
+    [Tooltip("인원 카드를 고른 뒤 누르는 매칭 시작 버튼. 비우면 카드를 누르는 즉시 신청 (2026-10-20 KPJ 요청·사용자 승인)")]
+    [SerializeField] Button startButton;
+    [Tooltip("3/4/5인 카드 순서의 기본·선택 이미지. 비우면 이미지를 바꾸지 않음")]
+    [SerializeField] Sprite[] cardDefaultSprites = new Sprite[0];
+    [SerializeField] Sprite[] cardSelectedSprites = new Sprite[0];
+    [Tooltip("선택한 카드의 크기 배율")]
+    [SerializeField] float selectedCardScale = 1.09f;
 
     [Header("매칭 대기 표시")]
     [SerializeField] GameObject queuePanel;
@@ -60,6 +67,7 @@ public class NYMMatchmakingUI : MonoBehaviour
     bool cancelPending;
     bool manualDisconnect;
     int matchSize;
+    int pickedSize;
     int shownSeconds = -1;
     int waitingCount;
     float queueStartedAt;
@@ -98,9 +106,10 @@ public class NYMMatchmakingUI : MonoBehaviour
     {
         nicknameInput.characterLimit = LexioPlayer.MaxNicknameLength;
         connectButton.onClick.AddListener(ShowModes);
-        threeButton.onClick.AddListener(() => Join(3));
-        fourButton.onClick.AddListener(() => Join(4));
-        fiveButton.onClick.AddListener(() => Join(5));
+        threeButton.onClick.AddListener(() => Pick(3));
+        fourButton.onClick.AddListener(() => Pick(4));
+        fiveButton.onClick.AddListener(() => Pick(5));
+        if (startButton != null) startButton.onClick.AddListener(() => Join(pickedSize));
         backButton.onClick.AddListener(Back);
         cancelButton.onClick.AddListener(Cancel);
         loadingTilePositions = new Vector2[loadingTiles.Length];
@@ -283,6 +292,29 @@ public class NYMMatchmakingUI : MonoBehaviour
         networkManager.PendingNickname = nickname;
         choosing = true;
         message = "";
+        pickedSize = 0; // 열 때마다 선택 없이 시작 (시작 버튼은 카드를 고른 뒤 활성)
+        RefreshCards();
+    }
+
+    // 시작 버튼이 있으면 카드는 선택만 하고, 없으면 기존처럼 바로 신청
+    void Pick(int size)
+    {
+        if (startButton == null) { Join(size); return; }
+        pickedSize = size;
+        RefreshCards();
+    }
+
+    void RefreshCards()
+    {
+        Button[] cards = { threeButton, fourButton, fiveButton };
+        for (int i = 0; i < cards.Length; i++)
+        {
+            bool picked = pickedSize == i + 3;
+            Sprite[] sprites = picked ? cardSelectedSprites : cardDefaultSprites;
+            if (i < sprites.Length && sprites[i] != null) cards[i].image.sprite = sprites[i];
+            cards[i].transform.localScale = Vector3.one * (picked ? selectedCardScale : 1f);
+        }
+        if (startButton != null) startButton.interactable = LexioProtocol.IsValidMatchSize(pickedSize);
     }
 
     void Join(int size)

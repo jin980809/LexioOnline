@@ -31,6 +31,7 @@
 
 | ID | 요청자 → 담당 | 내용 | 대상 | 상태 |
 |---|---|---|---|---|
+| KPJ-20261020-01 | KPJ(Claude) → NYM | 최종 빌드 씬을 KPJ/GameClient.unity(index0)·GameServer.unity(index1)로 통합. `Lexio/Build Game Scenes`가 KPJ Client·UI, NYM_Client/Server, LSY/UI_work를 합쳐 다시 생성(원본 씬 수정 없음). NYMAccountUI.cs는 사용자 승인으로 settingsPopup이 비면 볼륨 연결을 건너뛰게만 변경(GameClient는 KPJ SettingsPanel 사용). 결과창 나가기는 접속 유지 후 메인 복귀(KPJ DismissFinishedTable, 다음 매칭 신청 때 서버 LeaveFinishedMatch로 정리) | NYM/NYMAccountUI.cs·KPJ/1.Scene | 씬 생성·서버/클라 빌드 성공. 서버 EXE 헤드리스 자동 기동 확인, server-keys.json 없어 ServerStart 중단 — NYM 키 파일 필요. 실제 로그인·매칭·경기 플레이 미검수. 추가(사용자 승인): NYMMatchmakingUI 카드 선택→startButton으로 신청(startButton 비우면 기존 즉시 신청), NYMAccountUI quitConfirmPopup(비우면 기존 즉시 종료), 시작 점수 64→50(NYM_LexioTable 변형·LexioProtocol.StartScore), ProtocolVersion 6→7 — 서버·클라 재빌드 필요 |
 | DB-20261014-01 | GPT → Claude·DB 팀원 | KTS 실DB 검수 실패 보완: SignUpController가 (닉네임,ID,PW)를 넘겨 (ID,PW,닉네임)으로 저장. DBManager 닉네임 WHERE UserID 오류, 접속 실패 시 null reader 예외4종, 저장 실패 시 메모리 전적 선증가, 탈퇴 후 info 잔존. 정상 API CRUD/1~4위 저장은 롤백 검수 통과 | kts/SignUpController.cs·DBManager.cs | 검수 완료·수정 대기 — 팀원 원본 코드 수정 없음 |
 | KTS-20261014-01 | GPT → KTS/UI 팀원·Claude | 로그인 전 ProfileController NullReference, imageNum=-1/3 범위 예외 재현. KTS ProfilePopup profileImages 배열0, OtherProfile 여는 버튼이 OffObject 호출. 모든 비밀번호 InputField Standard/길이 제한0. 기본 로그인·가입·변경·탈퇴 Canvas 비활성. 작성자와 협의 후 코드 가드·씬 참조·마스킹 수정 | Assets/1.Scene/kts/kts.unity·kts/ProfileController.cs·ProfilePopup.cs | 검수 완료·수정 대기 — GPT 씬 원본 변경 없음 |
 

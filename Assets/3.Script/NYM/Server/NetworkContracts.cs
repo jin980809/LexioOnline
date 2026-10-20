@@ -6,13 +6,13 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 6;
+    public const int ProtocolVersion = 7; // 7: 시작 점수 64→50 (2026-10-20 사용자 결정)
     public const int RuleVersion = 2;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.
     public const int EntryFee = 50; // 실제 경기 시작 때 참가자마다 currentCoin에서 한 번 차감
     public const int RoundCount = 5;
-    public const int StartScore = 64;
+    public const int StartScore = 50;
     public const float TurnSeconds = 30f;
     public const int Cloud3TileId = 3;
 

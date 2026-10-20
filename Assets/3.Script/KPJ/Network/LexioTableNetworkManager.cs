@@ -11,9 +11,23 @@ public class LexioTableNetworkManager : NetworkManager
     [SerializeField] private LexioTable tablePrefab;
 
     private LexioTable serverTable;
+    private LexioTable clientTable;
+    // 결과 화면에서 메인으로 나간 테이블. 서버는 다음 매칭 신청 때 정리하므로 그때까지 클라에서만 없는 것으로 봄
+    private LexioTable dismissedTable;
 
     // 클라이언트: 현재 테이블과 내 플레이어
-    public LexioTable Table { get; private set; }
+    public LexioTable Table
+    {
+        get
+        {
+            LexioTable result = clientTable;
+            if (result != null && result == dismissedTable)
+            {
+                result = null;
+            }
+            return result;
+        }
+    }
     public LexioPlayer LocalPlayer { get; private set; }
 
     // 클라이언트가 접속 전에 입력한 닉네임
@@ -45,14 +59,28 @@ public class LexioTableNetworkManager : NetworkManager
 
     public void RegisterTable(LexioTable table)
     {
-        Table = table;
+        clientTable = table;
     }
 
     public void UnregisterTable(LexioTable table)
     {
-        if (Table == table)
+        if (clientTable == table)
         {
-            Table = null;
+            clientTable = null;
+        }
+        if (dismissedTable == table)
+        {
+            dismissedTable = null;
+        }
+    }
+
+    // 끝난 게임의 결과 화면을 닫고 메인으로 돌아감 (서버 연결은 유지)
+    // 끝나지 않은 게임은 닫지 않음
+    public void DismissFinishedTable()
+    {
+        if (clientTable != null && clientTable.Phase == GamePhase.Finished)
+        {
+            dismissedTable = clientTable;
         }
     }
 
@@ -165,6 +193,7 @@ public class LexioTableNetworkManager : NetworkManager
 
     public override void OnClientDisconnect()
     {
+        dismissedTable = null;
         base.OnClientDisconnect();
         if (ClientDisconnected != null)
         {

@@ -20,6 +20,16 @@ public class PopupView : MonoBehaviour
         }
     }
 
+    // 다른 코드가 루트를 직접 켜도(SetActive) 창이 튀어나오도록 켜질 때마다 창을 엶
+    private void OnEnable()
+    {
+        isClosing = false;
+        if (window != null)
+        {
+            window.Open();
+        }
+    }
+
     // 창의 닫힘 연출이 끝나면(PopOutAnimator가 창을 끔) 루트도 끔
     private void Update()
     {
@@ -32,11 +42,19 @@ public class PopupView : MonoBehaviour
 
     public void Open()
     {
-        isClosing = false;
-        gameObject.SetActive(true);
-        if (window != null)
+        if (gameObject.activeSelf)
         {
-            window.Open();
+            // 닫히는 중에 다시 열면 창만 다시 엶
+            isClosing = false;
+            if (window != null)
+            {
+                window.Open();
+            }
+        }
+        else
+        {
+            // 켜지면 OnEnable에서 창을 엶
+            gameObject.SetActive(true);
         }
     }
 

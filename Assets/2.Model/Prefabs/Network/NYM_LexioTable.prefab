@@ -10,7 +10,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 493788688936497039, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
       propertyPath: startingChips
-      value: 64
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 2878431153132084579, guid: 04c9e9afc0176c644a593a9a8e5cffea, type: 3}
       propertyPath: m_LocalPosition.x
