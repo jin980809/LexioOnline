@@ -8,6 +8,6 @@ public class SelectProfileImage : MonoBehaviour
 
     public void SelectImage()
     {
-        DBManager.instance.SelectImageON(imagesNum);
+        //PlayerDBManager.instance.SelectImageON(imagesNum);
     }
 }
