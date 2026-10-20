@@ -50,8 +50,16 @@ public class RecordNetworkBehaviour : NetworkBehaviour
             return;
         }
 
-        List<GameRecordData> records =
-            db.GetRecentRecords(targetUserID, playerCount);
+        List<GameRecordData> records;
+        try
+        {
+            records = db.GetRecentRecords(targetUserID, playerCount);
+        }
+        catch (System.Exception)
+        {
+            TargetReceiveRecords(connectionToClient, false, "전적 조회에 실패했습니다.", "");
+            return;
+        }
 
         var wrapper = new GameRecordList
         {

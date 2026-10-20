@@ -5,7 +5,7 @@ using System;
 public class UserInfo
 {
     public string userID;//유저 아이디
-    public string userPW;//유저 비밀번호
+    [NonSerialized] public string userPW;//유저 비밀번호
     public string userName;//유저 이름
     public int imageNum; //프로필 이미지
     public float first;//1등 횟수

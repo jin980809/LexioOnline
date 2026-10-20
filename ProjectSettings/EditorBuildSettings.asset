@@ -5,7 +5,7 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
+  - enabled: 1
     path: Assets/1.Scene/NYM_Client_Scene.unity
     guid: d9b5001068354c94688633752ca075d0
   - enabled: 1
@@ -20,7 +20,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/1.Scene/KPJ/Client.unity
     guid: 55c46e0ffe0c29d49a7d47aece52c900
-  - enabled: 1
+  - enabled: 0
     path: Assets/1.Scene/KPJ/Server.unity
     guid: 9d0142e5e702b6642b012eb6a7083c38
   m_configObjects:

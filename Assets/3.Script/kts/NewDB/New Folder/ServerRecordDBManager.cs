@@ -51,7 +51,7 @@ public class ServerRecordDBManager : MonoBehaviour
     // 게임 서버가 판정한 한 판의 모든 참가자 결과를 전달
     public bool SaveGameResults(List<GameResultInput> results)
     {
-        if (results == null || results.Count == 0)
+        if (results == null || results.Count == 0 || results[0] == null)
             return false;
 
         int playerCount = results[0].playerCount;
@@ -285,7 +285,7 @@ LIMIT 10;";
         catch (Exception e)
         {
             Debug.LogError($"[RecordDB] 전적 검색 실패: {e}");
-            records.Clear();
+            throw;
         }
 
         return records;

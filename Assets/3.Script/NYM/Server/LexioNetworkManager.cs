@@ -42,6 +42,13 @@ public class LexioNetworkManager : LexioTableNetworkManager
     readonly Dictionary<Guid, List<NetworkConnectionToClient>> matches = new Dictionary<Guid, List<NetworkConnectionToClient>>();
     readonly Dictionary<NetworkConnectionToClient, Guid> connectionMatch = new Dictionary<NetworkConnectionToClient, Guid>();
     readonly Dictionary<Guid, LexioTable> matchTables = new Dictionary<Guid, LexioTable>();
+    // 정원이 모여 입장료 DB 차감을 기다리는 연결. 이 동안 취소·재신청을 막는다.
+    readonly HashSet<NetworkConnectionToClient> starting = new HashSet<NetworkConnectionToClient>();
+    int startingMatches;
+    // 시작한 경기의 좌석별 계정(연결이 끊겨도 완료 저장에 필요). 저장을 시작하면 지운다.
+    readonly Dictionary<Guid, string[]> matchAccounts = new Dictionary<Guid, string[]>();
+    // 완료 저장 중인 계정. 저장 커밋 전 재매칭 차감과 순서가 섞이지 않도록 신청을 막는다.
+    readonly HashSet<string> saving = new HashSet<string>();
 
     int nextRequestId;
 
@@ -74,8 +81,12 @@ public class LexioNetworkManager : LexioTableNetworkManager
     {
         if (!conn.isAuthenticated || GetAccountKey(conn) == null) return RejectReason.NotLoggedIn;
         if (!LexioProtocol.IsValidMatchSize(request.matchSize)) return RejectReason.InvalidMatchSize;
-        if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
+        if (starting.Contains(conn) || saving.Contains(GetAccountKey(conn))) return RejectReason.AlreadyInMatch;
         if (queuedSize.ContainsKey(conn)) return RejectReason.AlreadyQueued; // 모드 변경은 취소 후 신청
+        // 미리 거르는 용도. 최종 잔액은 시작 직전 DB에서 다시 확인한다.
+        if (authenticator is NYMAccountAuthenticator && conn.authenticationData is PlayerProfile profile && profile.currentCoin < LexioProtocol.EntryFee)
+            return RejectReason.InsufficientCoin;
+        if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
 
         queues[request.matchSize].Add(conn);
         queuedSize[conn] = request.matchSize;
@@ -88,7 +99,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
     [Server]
     public RejectReason CancelQueue(NetworkConnectionToClient conn, QueueCancelRequest request)
     {
-        if (connectionMatch.ContainsKey(conn)) return RejectReason.AlreadyInMatch;
+        if (connectionMatch.ContainsKey(conn) || starting.Contains(conn)) return RejectReason.AlreadyInMatch;
         if (!RemoveFromQueue(conn)) return RejectReason.NotQueued;
         return RejectReason.None;
     }
@@ -123,6 +134,8 @@ public class LexioNetworkManager : LexioTableNetworkManager
     void EndMatch(Guid matchId)
     {
         if (!matches.TryGetValue(matchId, out List<NetworkConnectionToClient> seats)) return;
+        TrySaveMatch(matchId); // 결과 확정 직후 전원이 나가도 저장을 잃지 않게 테이블 파괴 전에 확인
+        matchAccounts.Remove(matchId); // 미완료(전원 이탈 등)는 저장 없음
         foreach (NetworkConnectionToClient seatConn in seats)
             if (seatConn != null) connectionMatch.Remove(seatConn);
         matches.Remove(matchId);
@@ -178,24 +191,118 @@ public class LexioNetworkManager : LexioTableNetworkManager
         foreach (KeyValuePair<int, List<NetworkConnectionToClient>> queue in queues)
         {
             int matchSize = queue.Key;
-            while (queue.Value.Count >= matchSize && matches.Count < maxMatches)
+            while (queue.Value.Count >= matchSize && matches.Count + startingMatches < maxMatches)
             {
                 List<NetworkConnectionToClient> seats = queue.Value.GetRange(0, matchSize); // 좌석 = 등록 순 0..N-1
                 queue.Value.RemoveRange(0, matchSize);
-
-                Guid matchId = Guid.NewGuid();
-                matches[matchId] = seats;
                 foreach (NetworkConnectionToClient seatConn in seats)
                 {
                     queuedSize.Remove(seatConn);
-                    connectionMatch[seatConn] = matchId;
+                    starting.Add(seatConn);
                 }
 
                 SendQueueUpdated(matchSize);
-                StartMatch(matchId, seats);
+                ChargeAndStart(Guid.NewGuid(), matchSize, seats); // 경기ID는 차감 전에 고정
             }
         }
     }
+
+    // 참가자 전원 입장료를 한 트랜잭션으로 차감한 뒤에만 시작한다. 실패하면 아무도 차감되지 않고,
+    // 부족/DB 오류 계정은 거절 알림, 나머지는 원래 순서로 대기열 앞에 되돌린다.
+    // shortcut: 차감 후 시작 전 연결 해제 시 복구는 메모리 상태 기준 1회 보상 UPDATE. 서버 재시작/복구 실패 대비 영속 원장은 DB-20261020-06 계약 후 추가.
+    async void ChargeAndStart(Guid matchId, int matchSize, List<NetworkConnectionToClient> seats)
+    {
+        startingMatches++;
+        var accounts = authenticator as NYMAccountAuthenticator; // shortcut: NYM 인증기가 없는 테스트 서버는 입장료 없이 시작
+        string[] userIds = seats.ConvertAll(GetAccountKey).ToArray();
+        RejectReason[] reasons = null;
+        PlayerProfile[] profiles = null;
+        if (accounts != null) (reasons, profiles) = await accounts.ChangeCoins(userIds, -LexioProtocol.EntryFee);
+
+        bool charged = reasons == null || Array.TrueForAll(reasons, reason => reason == RejectReason.None);
+        bool[] connected = seats.ConvertAll(IsConnected).ToArray();
+        if (charged && Array.TrueForAll(connected, value => value))
+        {
+            startingMatches--;
+            matches[matchId] = seats;
+            if (accounts != null) matchAccounts[matchId] = userIds;
+            for (int i = 0; i < seats.Count; i++)
+            {
+                starting.Remove(seats[i]);
+                connectionMatch[seats[i]] = matchId;
+                if (profiles != null) accounts.SendProfile(seats[i], profiles[i]);
+            }
+            StartMatch(matchId, seats);
+            return;
+        }
+
+        if (charged && accounts != null)
+        {
+            (RejectReason[] refund, _) = await accounts.ChangeCoins(userIds, LexioProtocol.EntryFee);
+            if (!Array.TrueForAll(refund, reason => reason == RejectReason.None))
+                Debug.LogError("[LexioNetworkManager] 입장료 복구 실패: " + string.Join(",", userIds));
+            connected = seats.ConvertAll(IsConnected).ToArray();
+        }
+        startingMatches--;
+
+        var back = new List<NetworkConnectionToClient>();
+        for (int i = 0; i < seats.Count; i++)
+        {
+            starting.Remove(seats[i]);
+            if (!connected[i]) continue;
+            if (reasons != null && reasons[i] != RejectReason.None) seats[i].Send(Result(0, reasons[i])); // requestId 0 = 서버 통보
+            else { back.Add(seats[i]); queuedSize[seats[i]] = matchSize; }
+        }
+        if (!NetworkServer.active) return;
+        queues[matchSize].InsertRange(0, back);
+        SendQueueUpdated(matchSize);
+        TryStartMatches();
+    }
+
+    // KPJ 테이블이 Finished가 되면 한 번 저장. AI로 바뀐 좌석(경기 중 이탈)은 제외하고, 유효 참가자 2명 이하는 Aborted로 보고 저장하지 않는다.
+    // 순위는 최종 칩 기준 경쟁 순위(같은 칩=같은 순위, 공동1등 모두 1등).
+    // shortcut: 중복 저장 방지는 matchAccounts 1회 제거(메모리) 기준, 실패 시 재시도 없이 Error 로그. 영속 완료 원장·재시작 복구는 DB-20261020-06 계약 후 추가.
+    // shortcut: 이탈자 칩 고정·KPJ Aborted 전환(QA-20261020-02)은 KPJ 담당, 여기서는 저장 제외만 한다.
+    void TrySaveMatch(Guid matchId)
+    {
+        if (!matchAccounts.TryGetValue(matchId, out string[] userIds) || !matchTables.TryGetValue(matchId, out LexioTable table) ||
+            table == null || table.Phase != GamePhase.Finished || !(authenticator is NYMAccountAuthenticator accounts)) return;
+        matchAccounts.Remove(matchId);
+
+        IReadOnlyList<SeatInfo> seatInfos = table.Seats;
+        var valid = new List<int>();
+        for (int i = 0; i < userIds.Length && i < seatInfos.Count; i++)
+            if (!seatInfos[i].isAi && userIds[i] != null) valid.Add(i);
+        if (valid.Count <= 2) return;
+
+        string[] ids = new string[valid.Count];
+        int[] ranks = new int[valid.Count], deltas = new int[valid.Count];
+        for (int v = 0; v < valid.Count; v++)
+        {
+            int chips = seatInfos[valid[v]].chips;
+            ids[v] = userIds[valid[v]];
+            deltas[v] = chips - table.StartingChips;
+            ranks[v] = 1 + valid.FindAll(other => seatInfos[other].chips > chips).Count;
+        }
+        SaveMatch(userIds.Length, ids, ranks, deltas, accounts);
+    }
+
+    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, NYMAccountAuthenticator accounts)
+    {
+        foreach (string id in ids) saving.Add(id);
+        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, DateTime.UtcNow);
+        foreach (string id in ids) saving.Remove(id);
+        if (profiles == null) { Debug.LogError("[LexioNetworkManager] 경기 결과 저장 실패: " + string.Join(",", ids)); return; }
+        if (!NetworkServer.active) return;
+        foreach (NetworkConnectionToClient conn in NetworkServer.connections.Values)
+        {
+            int index = Array.IndexOf(ids, GetAccountKey(conn));
+            if (index >= 0) accounts.SendProfile(conn, profiles[index]);
+        }
+    }
+
+    static bool IsConnected(NetworkConnectionToClient conn) =>
+        NetworkServer.active && NetworkServer.connections.TryGetValue(conn.connectionId, out NetworkConnectionToClient current) && current == conn;
 
     // 같은 matchId를 테이블·플레이어 NetworkMatch에 스폰 전에 넣어 MatchInterestManagement로 경기끼리 격리한다.
     void StartMatch(Guid matchId, List<NetworkConnectionToClient> seats)
@@ -251,6 +358,8 @@ public class LexioNetworkManager : LexioTableNetworkManager
     public override void LateUpdate()
     {
         base.LateUpdate();
+        if (NetworkServer.active && matchAccounts.Count > 0)
+            foreach (Guid matchId in new List<Guid>(matchAccounts.Keys)) TrySaveMatch(matchId);
     }
 
     /// <summary>
@@ -497,9 +606,11 @@ public class LexioNetworkManager : LexioTableNetworkManager
     {
         foreach (List<NetworkConnectionToClient> queue in queues.Values) queue.Clear();
         queuedSize.Clear();
+        starting.Clear(); // startingMatches는 진행 중인 ChargeAndStart가 스스로 줄인다
         matches.Clear();
         connectionMatch.Clear();
         matchTables.Clear();
+        matchAccounts.Clear();
         base.OnStopServer();
     }
 

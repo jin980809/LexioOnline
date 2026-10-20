@@ -22,6 +22,8 @@ public class NYMAccountUI : MonoBehaviour
     Text pendingFeedback;
     float deadline;
     bool returnToInfo;
+    int historyTab, historyRequest, historyPage;
+    GameRecordEntry[] history = new GameRecordEntry[0];
 
     T Get<T>(string path) where T : Component => uiRoot.Find(path).GetComponent<T>();
     Transform Panel(string name) => uiRoot.Find(name + "/Window");
@@ -32,6 +34,7 @@ public class NYMAccountUI : MonoBehaviour
         if (account == null) return;
         account.ActionResultReceived += OnActionResult;
         account.ResultReceived += OnLoginResult;
+        account.RecordsReceived += OnRecords;
         account.GetComponent<LexioNetworkManager>().ClientDisconnected += OnDisconnected;
     }
     void OnDisable()
@@ -39,6 +42,7 @@ public class NYMAccountUI : MonoBehaviour
         if (account == null) return;
         account.ActionResultReceived -= OnActionResult;
         account.ResultReceived -= OnLoginResult;
+        account.RecordsReceived -= OnRecords;
         if (LexioNetworkManager.singleton != null) LexioNetworkManager.singleton.ClientDisconnected -= OnDisconnected;
     }
 
@@ -113,6 +117,9 @@ public class NYMAccountUI : MonoBehaviour
 
         string[] tabs = { "AllTab", "Tab3P", "Tab4P", "Tab5P" };
         for (int i = 0; i < tabs.Length; i++) { int index = i; Get<Button>("HistoryPopup/Window/Tabs/" + tabs[i]).onClick.AddListener(() => HistoryTab(index)); }
+        Get<Button>("MainPage/Menu/HistoryButton").onClick.AddListener(() => HistoryTab(historyTab));
+        Get<Button>("HistoryPopup/Window/Pager/PrevButton").onClick.AddListener(() => { historyPage--; ShowHistory(null); });
+        Get<Button>("HistoryPopup/Window/Pager/NextButton").onClick.AddListener(() => { historyPage++; ShowHistory(null); });
         HistoryTab(0); SelectColor(0, false); SelectColor(0, true);
     }
 
@@ -279,6 +286,7 @@ public class NYMAccountUI : MonoBehaviour
     }
     void OnDisconnected()
     {
+        if (historyRequest != 0) { historyRequest = 0; ShowHistory("서버 연결이 종료되었습니다."); }
         if (pendingId == 0) return;
         pendingId = 0; Feedback(pendingFeedback, "서버 연결이 종료되었습니다.");
     }
@@ -296,7 +304,49 @@ public class NYMAccountUI : MonoBehaviour
             var button = Get<Button>("HistoryPopup/Window/Tabs/" + names[i]);
             if (button.spriteState.selectedSprite != null) button.image.sprite = i == index ? button.spriteState.selectedSprite : button.spriteState.disabledSprite;
         }
-        Get<Text>("HistoryPopup/Window/EmptyText").text = (index == 0 ? "" : (index + 2) + "인 ") + "저장된 전적이 없습니다.";
+        historyTab = index; historyPage = 0; history = new GameRecordEntry[0];
+        if (historyRequest != 0) { ShowHistory("불러오는 중..."); return; } // 응답 후 OnRecords가 현재 탭으로 다시 요청
+        historyRequest = LoggedIn ? account.RequestRecords(HistoryMatchSize) : 0;
+        ShowHistory(historyRequest != 0 ? "불러오는 중..." : "로그인 후 전적을 볼 수 있습니다.");
+    }
+    int HistoryMatchSize => historyTab == 0 ? 0 : historyTab + 2;
+    void OnRecords(RecordQueryResult result)
+    {
+        if (historyRequest == 0 || result.requestId != historyRequest) return;
+        historyRequest = 0;
+        if (result.matchSize != HistoryMatchSize) { HistoryTab(historyTab); return; }
+        if (result.code != AccountResultCode.Success) { ShowHistory("전적을 불러오지 못했습니다."); return; }
+        history = result.records ?? new GameRecordEntry[0];
+        ShowHistory(history.Length == 0 ? (historyTab == 0 ? "" : HistoryMatchSize + "인 ") + "저장된 전적이 없습니다." : null);
+    }
+    // message가 있으면 목록 대신 안내만 표시. 행 템플릿 List/Row0..N을 페이지 단위로 채운다.
+    void ShowHistory(string message)
+    {
+        var window = Panel("HistoryPopup");
+        var list = window.Find("List");
+        int rows = list.childCount, pages = Mathf.Max(1, (history.Length + rows - 1) / rows);
+        historyPage = Mathf.Clamp(historyPage, 0, pages - 1);
+        var empty = window.Find("EmptyText").GetComponent<Text>();
+        empty.text = message ?? ""; empty.gameObject.SetActive(message != null);
+        list.gameObject.SetActive(message == null);
+        for (int i = 0; i < rows; i++)
+        {
+            var row = list.GetChild(i);
+            int index = historyPage * rows + i;
+            row.gameObject.SetActive(message == null && index < history.Length);
+            if (!row.gameObject.activeSelf) continue;
+            var record = history[index];
+            row.Find("RankText").GetComponent<Text>().text = record.rank + "위 <size=20><color=#8A80A6>/ " + record.matchSize + "인</color></size>";
+            // KST는 서머타임이 없어 UTC+9 고정
+            row.Find("DateText").GetComponent<Text>().text = new DateTime(record.playedAtUtcTicks, DateTimeKind.Utc).AddHours(9).ToString("MM.dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+            row.Find("Crown").gameObject.SetActive(record.rank == 1);
+            row.Find("Players").gameObject.SetActive(false); // 전적 행에 참가자 정보 없음
+            row.Find("RoundBadge/RoundText").GetComponent<Text>().text = LexioProtocol.RoundCount + "라운드";
+            row.Find("ChipDeltaText").GetComponent<Text>().text = record.finalCoin.ToString(); // 증감이 아니라 정산 후 잔액
+        }
+        window.Find("Pager/PageText").GetComponent<Text>().text = (historyPage + 1) + " <color=#ADA5C4>/ " + pages + "</color>";
+        window.Find("Pager/PrevButton").GetComponent<Button>().interactable = message == null && historyPage > 0;
+        window.Find("Pager/NextButton").GetComponent<Button>().interactable = message == null && historyPage < pages - 1;
     }
     void Quit()
     {

@@ -157,7 +157,20 @@ public class NYMMatchmakingUI : MonoBehaviour
         var window = accountText.transform.parent;
         window.Find("TotalGamesStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed + "판";
         window.Find("FirstPlaceStat/ValueText").GetComponent<Text>().text = profile.wins + "회";
-        window.Find("FirstRateStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed == 0 ? "—" : Mathf.RoundToInt(profile.wins * 100f / profile.gamesPlayed) + "%";
+        window.Find("FirstRateStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed == 0 ? "—" : profile.winRate.ToString("0.#") + "%";
+        window.Find("ChipBox/ChipText").GetComponent<Text>().text = profile.currentCoin.ToString("0.##");
+        window.Find("BestChipStat/ValueText").GetComponent<Text>().text = profile.maxCoin.ToString("0.##");
+        ModeRow(window, "Row3P", profile.threePlayNum, profile.threeFirst);
+        ModeRow(window, "Row4P", profile.fourPlayNum, profile.fourFirst);
+        ModeRow(window, "Row5P", profile.fivePlayNum, profile.fiveFirst);
+    }
+
+    // 막대 = 해당 모드 1등 비율
+    static void ModeRow(Transform window, string row, int games, int first)
+    {
+        window.Find(row + "/GamesText").GetComponent<Text>().text = games + "판";
+        window.Find(row + "/FirstText").GetComponent<Text>().text = first + "회";
+        window.Find(row + "/Bar").GetComponent<Slider>().normalizedValue = games == 0 ? 0f : (float)first / games;
     }
 
     Sprite Avatar(int index) => index >= 0 && index < avatarSprites.Length ? avatarSprites[index] : joinedSlotSprite;
@@ -306,6 +319,13 @@ public class NYMMatchmakingUI : MonoBehaviour
     void OnQueueResult(RequestResult result)
     {
         if (matchSize == 0 || !joinSent) return;
+        if (result.requestId == 0) // 서버 통보: 정원은 모였지만 입장료 처리 실패
+        {
+            cancelPending = false;
+            ResetRequest();
+            message = RejectText(result.reason);
+            return;
+        }
         if (cancelPending)
         {
             cancelPending = false;
@@ -327,8 +347,15 @@ public class NYMMatchmakingUI : MonoBehaviour
         else
         {
             ResetRequest();
-            message = "매칭 신청이 거절되었습니다. 다시 선택하세요.";
+            message = RejectText(result.reason);
         }
+    }
+
+    static string RejectText(RejectReason reason)
+    {
+        if (reason == RejectReason.InsufficientCoin) return string.Format("토큰이 부족합니다. 경기 입장에 {0} 토큰이 필요합니다.", LexioProtocol.EntryFee);
+        if (reason == RejectReason.ServiceUnavailable) return "서버 DB 오류로 경기를 시작하지 못했습니다. 다시 시도하세요.";
+        return "매칭 신청이 거절되었습니다. 다시 선택하세요.";
     }
 
     void Cancel()
