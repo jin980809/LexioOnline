@@ -11,6 +11,9 @@ public class RuleBookPanel : MonoBehaviour
     private RectTransform drawer;
     private bool isOpen;
     private float progress;
+    // 마지막으로 위치를 넣었을 때의 진행도와 서랍 폭 (둘 다 그대로면 위치를 다시 넣지 않음. 넣으면 캔버스를 다시 그림)
+    private float appliedProgress = -1f;
+    private float appliedWidth = -1f;
 
     public bool IsOpen
     {
@@ -48,8 +51,11 @@ public class RuleBookPanel : MonoBehaviour
             float step = Time.unscaledDeltaTime / Mathf.Max(0.01f, slideSeconds);
             progress = Mathf.MoveTowards(progress, target, step);
         }
-        // 화면 크기가 바뀌면 서랍 폭도 바뀌므로 위치는 매 프레임 다시 계산
-        ApplyPosition();
+        // 화면 크기가 바뀌면 서랍 폭도 바뀌므로 폭이 바뀌었을 때도 다시 계산
+        if (progress != appliedProgress || drawer.rect.width != appliedWidth)
+        {
+            ApplyPosition();
+        }
     }
 
     public void Toggle()
@@ -65,6 +71,8 @@ public class RuleBookPanel : MonoBehaviour
             Vector2 position = drawer.anchoredPosition;
             position.x = -drawer.rect.width * eased;
             drawer.anchoredPosition = position;
+            appliedProgress = progress;
+            appliedWidth = drawer.rect.width;
         }
     }
 }

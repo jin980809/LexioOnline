@@ -67,6 +67,8 @@ public class LexioUI : MonoBehaviour
     [SerializeField] private float timerShakeSpeed = 25f;
     [SerializeField] private Text roundText;
     [SerializeField] private Text turnText;
+    // 차례 글자 칸은 배너 이미지보다 넓으므로, 긴 닉네임은 배너 너비에서 양쪽 여백을 뺀 너비에 맞춤
+    [SerializeField] private float turnTextPadding = 20f;
     // 패 정리 시간에만 켜지는 준비 인원 패널 ("준비 2 / 4"). 씬에 없으면 건너뜀
     [SerializeField] private GameObject readyPanel;
     [SerializeField] private Text readyCountText;
@@ -150,6 +152,7 @@ public class LexioUI : MonoBehaviour
     private bool isSettling;
     private Combination lastPlayCombination;
     private readonly CombinationText combinationText = new CombinationText();
+    private readonly NicknameFitter nicknameFitter = new NicknameFitter();
     private CanvasGroup submitGroup;
     private CanvasGroup passGroup;
     private Color defaultSelectionColor;
@@ -387,7 +390,7 @@ public class LexioUI : MonoBehaviour
         builder.Append("대기 중 (").Append(table.Seats.Count).Append(" / ").Append(GameRules.MaxPlayers).Append(")\n\n");
         for (int i = 0; i < table.Seats.Count; i++)
         {
-            builder.Append(i + 1).Append(". ").Append(table.Seats[i].nickname).Append('\n');
+            builder.Append(i + 1).Append(". ").Append(nicknameFitter.Shorten(table.Seats[i].nickname)).Append('\n');
         }
         lobbyPlayersText.text = builder.ToString();
     }
@@ -413,7 +416,7 @@ public class LexioUI : MonoBehaviour
 
         if (isSettling)
         {
-            turnText.text = "정산 시간";
+            SetTurnText("", "정산 시간");
         }
         else if (table.IsPreparing)
         {
@@ -431,7 +434,7 @@ public class LexioUI : MonoBehaviour
                     }
                 }
             }
-            turnText.text = "패 정리 시간";
+            SetTurnText("", "패 정리 시간");
             if (readyCountText != null)
             {
                 builder.Clear();
@@ -441,25 +444,23 @@ public class LexioUI : MonoBehaviour
         }
         else if (table.Phase == GamePhase.Playing && table.CurrentSeat >= 0)
         {
-            builder.Clear();
-            if (table.CurrentSeat == mySeat)
+            string turnName = "";
+            string turnSuffix = "내 차례";
+            if (table.CurrentSeat != mySeat)
             {
-                builder.Append("내 차례");
-            }
-            else
-            {
-                builder.Append(GetNickname(table, table.CurrentSeat)).Append(" 차례");
+                turnName = GetNickname(table, table.CurrentSeat);
+                turnSuffix = " 차례";
             }
 
             if (table.IsLeadTurn)
             {
-                builder.Append(" (선)");
+                turnSuffix += " (선)";
             }
-            turnText.text = builder.ToString();
+            SetTurnText(turnName, turnSuffix);
         }
         else
         {
-            turnText.text = "";
+            SetTurnText("", "");
         }
 
         if (readyPanel != null)
@@ -472,7 +473,7 @@ public class LexioUI : MonoBehaviour
         if (mySeat >= 0 && mySeat < table.Seats.Count)
         {
             SeatInfo mine = table.Seats[mySeat];
-            myNameText.text = mine.nickname;
+            nicknameFitter.SetText(myNameText, mine.nickname, "", 0f);
             SetNumberText(myChipText, chipView.GetShownChips(mySeat, mine.chips));
             SetNumberText(myTileText, mine.tileCount);
             SetProfile(myProfileImage, mine.profileImage);
@@ -498,7 +499,7 @@ public class LexioUI : MonoBehaviour
         if (lastPlayCombination != null && table.LastPlaySeat >= 0)
         {
             // 족보 문양 숫자 (예: 스트레이트 해 1). 말풍선과 같은 형식
-            lastPlayText.text = GetNickname(table, table.LastPlaySeat) + " : " + combinationText.GetPlayText(lastPlayCombination, table.MaxNumber);
+            nicknameFitter.SetText(lastPlayText, GetNickname(table, table.LastPlaySeat), " : " + combinationText.GetPlayText(lastPlayCombination, table.MaxNumber), 0f);
         }
         else
         {
@@ -674,11 +675,11 @@ public class LexioUI : MonoBehaviour
                 SeatInfo info = table.Seats[i];
                 if (info.isAi)
                 {
-                    seatNameTexts[i].text = info.nickname + " (AI)";
+                    nicknameFitter.SetText(seatNameTexts[i], info.nickname, " (AI)", 0f);
                 }
                 else
                 {
-                    seatNameTexts[i].text = info.nickname;
+                    nicknameFitter.SetText(seatNameTexts[i], info.nickname, "", 0f);
                 }
                 SetNumberText(GetArrayItem(seatChipTexts, i), chipView.GetShownChips(i, info.chips));
                 SetNumberText(GetArrayItem(seatTileTexts, i), info.tileCount);
@@ -845,7 +846,12 @@ public class LexioUI : MonoBehaviour
                     if (screenPoint.z > 0f)
                     {
                         isVisible = true;
-                        seatLabels[i].position = GetAvoidedLabelPosition(seatLabels[i], screenPoint.x, screenPoint.y);
+                        Vector3 labelPosition = GetAvoidedLabelPosition(seatLabels[i], screenPoint.x, screenPoint.y);
+                        // 위치가 그대로면 다시 넣지 않음 (넣으면 캔버스를 다시 그림)
+                        if (seatLabels[i].position != labelPosition)
+                        {
+                            seatLabels[i].position = labelPosition;
+                        }
                     }
                 }
             }
@@ -1198,7 +1204,7 @@ public class LexioUI : MonoBehaviour
             {
                 builder.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(myResultColor)).Append('>');
             }
-            builder.Append(resultRanks[seat]).Append("위   ").Append(table.Seats[seat].nickname);
+            builder.Append(resultRanks[seat]).Append("위   ").Append(nicknameFitter.Shorten(table.Seats[seat].nickname));
             if (table.Seats[seat].isAi)
             {
                 builder.Append(" (AI)");
@@ -1249,6 +1255,18 @@ public class LexioUI : MonoBehaviour
             text = seconds.ToString();
         }
         return text;
+    }
+
+    // 차례 배너 글자. 닉네임이 길면 배너 이미지 안에 들어가게 줄임 (배너가 부모가 아닌 씬에서는 글자 칸 너비 기준)
+    private void SetTurnText(string nickname, string suffix)
+    {
+        float width = 0f;
+        RectTransform banner = turnText.rectTransform.parent as RectTransform;
+        if (banner != null)
+        {
+            width = Mathf.Min(turnText.rectTransform.rect.width, banner.rect.width - turnTextPadding * 2f);
+        }
+        nicknameFitter.SetText(turnText, nickname, suffix, width);
     }
 
     private string GetNickname(LexioTable table, int seat)

@@ -46,6 +46,8 @@ public class ResultPanelView : MonoBehaviour
     // 초당 회전 각도
     [SerializeField] private float lightRaysSpeed = 6f;
 
+    private readonly NicknameFitter nicknameFitter = new NicknameFitter();
+
     private void Update()
     {
         if (lightRays != null)
@@ -123,12 +125,12 @@ public class ResultPanelView : MonoBehaviour
 
         if (row.nameText != null)
         {
-            string displayName = info.nickname;
+            string suffix = "";
             if (info.isAi)
             {
-                displayName += " (AI)";
+                suffix = " (AI)";
             }
-            row.nameText.text = displayName;
+            nicknameFitter.SetText(row.nameText, info.nickname, suffix, 0f);
         }
 
         if (row.meTag != null)

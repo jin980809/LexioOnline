@@ -116,7 +116,9 @@ public class LexioSetup
             AssetDatabase.CreateAsset(database, TileDatabasePath);
         }
 
-        string[] folders = { "Cloude", "Star", "Moon", "Sun" };
+        string[] folders = { "Cloud", "Star", "Moon", "Sun" };
+        // 구름 폴더는 예전 이름(Cloude)인 프로젝트도 있어서, 새 이름에 없으면 예전 이름에서도 찾음
+        string[] oldFolders = { "Cloude", "Star", "Moon", "Sun" };
         string[] prefixes = { "Cloud", "Star", "Moon", "Sun" };
         for (int suit = 0; suit < GameRules.SuitCount; suit++)
         {
@@ -124,6 +126,11 @@ public class LexioSetup
             {
                 string path = TilePrefabFolder + "/" + folders[suit] + "/" + prefixes[suit] + number + ".prefab";
                 GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null)
+                {
+                    string oldPath = TilePrefabFolder + "/" + oldFolders[suit] + "/" + prefixes[suit] + number + ".prefab";
+                    prefab = AssetDatabase.LoadAssetAtPath<GameObject>(oldPath);
+                }
                 if (prefab == null)
                 {
                     Debug.LogWarning("[Lexio] 타일 프리팹 없음: " + path);
@@ -518,13 +525,13 @@ public class LexioSetup
         // 한 줄이 같이 움직이도록 모두 화면 아래 가운데 기준 (x는 버튼 가운데 위치). 화면 비율이 바뀌어도 간격 유지
         Vector2 buttonSize = new Vector2(236.7f, 96.8f);
         Vector2 bottomCenter = new Vector2(0.5f, 0f);
-        Button clearSelectionButton = CreateSpriteButton("ClearSelectionButton", gamePanel, "text/btn_select_clear", "선택 해제", Anchored(bottomCenter, bottomCenter, new Vector2(-401.65f, 30f), buttonSize));
-        Button sortSuitButton = CreateSpriteButton("SortSuitButton", gamePanel, "text/btn_sort_suit", "문양 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(-143.05f, 30f), buttonSize));
-        Button sortNumberButton = CreateSpriteButton("SortNumberButton", gamePanel, "text/btn_sort_number", "숫자 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(115.65f, 30f), buttonSize));
-        Button submitButton = CreateSpriteButton("SubmitButton", gamePanel, "text/btn_submit", "제출", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
-        Button passButton = CreateSpriteButton("PassButton", gamePanel, "text/btn_pass", "패스", Anchored(bottomCenter, bottomCenter, new Vector2(632.85f, 30f), buttonSize));
+        Button clearSelectionButton = CreateSpriteButton("ClearSelectionButton", gamePanel, "text_icon/btn_select_clear", "선택 해제", Anchored(bottomCenter, bottomCenter, new Vector2(-401.65f, 30f), buttonSize));
+        Button sortSuitButton = CreateSpriteButton("SortSuitButton", gamePanel, "text_icon/btn_sort_suit", "문양 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(-143.05f, 30f), buttonSize));
+        Button sortNumberButton = CreateSpriteButton("SortNumberButton", gamePanel, "text_icon/btn_sort_number", "숫자 정렬", Anchored(bottomCenter, bottomCenter, new Vector2(115.65f, 30f), buttonSize));
+        Button submitButton = CreateSpriteButton("SubmitButton", gamePanel, "text_icon/btn_submit", "제출", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
+        Button passButton = CreateSpriteButton("PassButton", gamePanel, "text_icon/btn_pass", "패스", Anchored(bottomCenter, bottomCenter, new Vector2(632.85f, 30f), buttonSize));
         // 패 정리 시간에만 켜짐 (그동안 꺼지는 제출 버튼 자리에 같은 크기로 표시)
-        Button readyButton = CreateSpriteButton("ReadyButton", gamePanel, "text/btn_ready", "준비 완료", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
+        Button readyButton = CreateSpriteButton("ReadyButton", gamePanel, "text_icon/btn_ready", "준비 완료", Anchored(bottomCenter, bottomCenter, new Vector2(374.25f, 30f), buttonSize));
         readyButton.gameObject.SetActive(false);
 
         // 패 위 중앙: 선택한 패 정보 (흰 글자 + 검은 외곽선)
@@ -538,6 +545,13 @@ public class LexioSetup
         // 오른쪽 위 설정 버튼 (기능 미구현, 버튼만 배치)
         CreateSpriteButton("SettingsButton", gamePanel, "icon_button/btn_settings", "설정", Corner(Vector2.one, new Vector2(-48f, -39f), new Vector2(121.8f, 131.5f)));
 
+        // 매 프레임 바뀌는 UI(상대 이름표, 내 정보, 타이머)만 따로 묶는 자식 캔버스
+        // UI가 바뀌면 그 UI가 속한 캔버스 전체를 다시 그리므로, 버튼/배지가 있는 LexioCanvas가 매 프레임 다시 그려지지 않게 나눔
+        // 크기와 위치는 GamePanel과 같음(전체). 안의 UI는 모두 클릭을 받지 않으므로 GraphicRaycaster는 붙이지 않음
+        // 족보표 서랍보다 먼저 만들어 서랍이 이 위에 그려짐
+        RectTransform dynamicPanel = CreateRect("DynamicCanvas", gamePanel, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+        dynamicPanel.gameObject.AddComponent<Canvas>();
+
         // 상대 이름표: 왼쪽 프로필, 오른쪽 윗줄 이름, 아랫줄 칩/남은 패, 오른쪽 위 준비 표시
         RectTransform[] seatLabels = new RectTransform[GameRules.MaxPlayers];
         Text[] seatNameTexts = new Text[GameRules.MaxPlayers];
@@ -549,7 +563,7 @@ public class LexioSetup
         Text[] seatBubbleTexts = new Text[GameRules.MaxPlayers];
         for (int i = 0; i < GameRules.MaxPlayers; i++)
         {
-            Image label = CreateSlicedImage("SeatLabel" + i, gamePanel, pillSprite, 1.39f, Center(Vector2.zero, new Vector2(345.8f, 123.9f)));
+            Image label = CreateSlicedImage("SeatLabel" + i, dynamicPanel, pillSprite, 1.39f, Center(Vector2.zero, new Vector2(345.8f, 123.9f)));
             seatLabels[i] = label.rectTransform;
             seatNameTexts[i] = CreateGameText("Name", label.transform, 35, TextAnchor.MiddleLeft, Spanned(Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), new Vector2(29.4f, 24.5f), new Vector2(-188.2f, -77.8f)), false);
             // 상대 말풍선: 이름표 바로 위 (이름표 자식이라 같이 움직이고 같이 꺼짐)
@@ -564,7 +578,7 @@ public class LexioSetup
         }
 
         // 내 정보: 화면 왼쪽 아래, 그 오른쪽은 3D 패 (HandView.handCenter로 위치 맞춤)
-        Image myInfo = CreateSlicedImage("MyInfo", gamePanel, creamSprite, 1f, Anchored(Vector2.zero, new Vector2(0.5f, 0.5f), new Vector2(242f, 228.6f), new Vector2(344.6f, 167.8f)));
+        Image myInfo = CreateSlicedImage("MyInfo", dynamicPanel, creamSprite, 1f, Anchored(Vector2.zero, new Vector2(0.5f, 0.5f), new Vector2(242f, 228.6f), new Vector2(344.6f, 167.8f)));
         Text myNameText = CreateGameText("Name", myInfo.transform, 40, TextAnchor.MiddleLeft, Corner(Vector2.zero, new Vector2(126f, 82.6f), new Vector2(144.7f, 56.9f)), false);
         Image myProfileImage = CreateImage("Profil_Image", myInfo.transform, profileFrameSprite, Center(new Vector2(-106f, 7.5f), new Vector2(100f, 100f)));
         Text myChipText = CreateStatRow(myInfo.transform, new Vector2(-1.9f, -21.25f), true, chipIcon);
@@ -576,7 +590,7 @@ public class LexioSetup
         Text myBubbleText = CreateBubble("Bubble", myInfo.transform, Anchored(new Vector2(0.5f, 1f), new Vector2(0.5f, 0f), new Vector2(0f, 11.4f), Vector2.zero), bubbleSprite, bubbleTailSprite);
 
         // 오른쪽 아래 타이머: 원형 게이지(남은 시간 비율) + 남은 초
-        Image timer = CreateImage("Timer", gamePanel, LoadSprite("timer/timer_bg.png"), Anchored(new Vector2(1f, 0f), new Vector2(0.5f, 0.5f), new Vector2(-108.9f, 85f), new Vector2(138.2f, 145.6f)));
+        Image timer = CreateImage("Timer", dynamicPanel, LoadSprite("timer/timer_bg.png"), Anchored(new Vector2(1f, 0f), new Vector2(0.5f, 0.5f), new Vector2(-108.9f, 85f), new Vector2(138.2f, 145.6f)));
         Slider timerSlider = CreateTimerSlider(timer.transform, LoadSprite("timer/timer_fill.png"));
         Text timerText = CreateGameText("TimerText", timer.transform, 50, TextAnchor.MiddleCenter, Anchored(new Vector2(1f, 0f), Vector2.zero, new Vector2(-169.1f, 26.1f), new Vector2(200f, 80f)), false);
 
