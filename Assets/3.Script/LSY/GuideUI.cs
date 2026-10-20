@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using UnityEngine.UI;
 
 [System.Serializable]
@@ -13,9 +14,12 @@ public class TutorialPageData
 
     [Header("커스텀 UI")]
     public GameObject customUI;
+
+    [Header("슬라이드쇼")]
+    public GameObject[] slides;
 }
 
-public class MenuUI : MonoBehaviour
+public class GuideUI : MonoBehaviour
 {
     [Header("UI 텍스트")]
     public Text pageNumtext;
@@ -38,7 +42,96 @@ public class MenuUI : MonoBehaviour
     public Sprite NowDotSprite;
     public Sprite LaterDotSprite;
 
+    [Header("슬라이드쇼")]
+    [SerializeField] private float slideInterval = 1.5f;
+    [SerializeField] private float fadeDuration = 0.5f;
+
+    private Coroutine slideRoutine;
+
     private int pageNow = 0;
+
+    private void OnDisable()
+    {
+        StopSlideShow();
+    }
+
+    private void StopSlideShow()
+    {
+        if (slideRoutine != null)
+        {
+            StopCoroutine(slideRoutine);
+            slideRoutine = null;
+        }
+
+        for (int i = 0; i < pages.Length; i++)
+        {
+            if (pages[i].slides == null)
+            {
+                continue;
+            }
+            for (int j = 0; j < pages[i].slides.Length; j++)
+            {
+                if (pages[i].slides[j] != null)
+                {
+                    pages[i].slides[j].SetActive(false);
+                }
+            }
+        }
+    }
+
+    private void StartSlideShow(GameObject[] slides)
+    {
+        StopSlideShow();
+
+        if (slides == null || slides.Length == 0)
+        {
+            return;
+        }
+        slideRoutine = StartCoroutine(SlideShow(slides));
+    }
+
+    private IEnumerator SlideShow(GameObject[] slides)
+    {
+        for (int i = 0; i < slides.Length; i++)
+        {
+            if (slides[i] == null) continue;
+            slides[i].SetActive(true);
+            GetGroup(slides[i]).alpha = (i == 0) ? 1f : 0f;
+        }
+        int index = 0;
+        while (slides.Length > 1)
+        {
+            yield return new WaitForSecondsRealtime(slideInterval);
+
+            int next = (index + 1) % slides.Length;
+            CanvasGroup from = GetGroup(slides[index]);
+            CanvasGroup to = GetGroup(slides[next]);
+
+            float t = 0f;
+            while (t < fadeDuration)
+            {
+                t += Time.unscaledDeltaTime;
+                float p = Mathf.Clamp01(t / fadeDuration);
+                from.alpha = 1f - p;
+                to.alpha = p;
+                yield return null;
+            }
+            from.alpha = 0f;
+            to.alpha = 1f;
+
+            index = next;
+        }
+    }
+
+    private CanvasGroup GetGroup(GameObject obj)
+    {
+        CanvasGroup group = obj.GetComponent<CanvasGroup>();
+        if (group == null)
+        {
+            group = obj.AddComponent<CanvasGroup>();
+        }
+        return group;
+    }
 
     public void ResetPage()
     {
@@ -79,6 +172,10 @@ public class MenuUI : MonoBehaviour
 
     private void UpdateUI()
     {
+        if (pages == null || pages.Length == 0)
+        {
+            return;
+        }
         TutorialPageData currentData = pages[pageNow];
         if (pageNumtext != null)
         {
@@ -139,5 +236,6 @@ public class MenuUI : MonoBehaviour
                 dots[i].SetNativeSize();
             }
         }
+        StartSlideShow(currentData.slides);
     }
 }
