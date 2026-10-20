@@ -10,6 +10,6 @@ public class ProfileController : MonoBehaviour
 
     private void OnEnable()
     {
-        mainImage.sprite = profileImages[DBManager.instance.info.imageNum];
+        mainImage.sprite = profileImages[PlayerDBManager.instance.userInfo.imageNum];
     }
 }

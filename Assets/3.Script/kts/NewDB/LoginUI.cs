@@ -79,18 +79,14 @@ public class LoginUI : MonoBehaviour
 
         if (userinfo == null)
         {
-            Debug.LogError(
-                "[Client] 로그인은 성공했지만 UserInfo가 null입니다."
-            );
+            Debug.LogError("[Client] 로그인은 성공했지만 UserInfo가 null입니다.");
             loginResultText.text = "사용자 정보를 받아오지 못했습니다.";
             return;
         }
 
         if (PlayerDBManager.instance == null)
         {
-            Debug.LogError(
-                "[Client] PlayerDBManager 인스턴스가 없습니다."
-            );
+            Debug.LogError("[Client] PlayerDBManager 인스턴스가 없습니다.");
             loginResultText.text = "사용자 정보 저장소가 없습니다.";
             return;
         }

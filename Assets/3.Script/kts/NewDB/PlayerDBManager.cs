@@ -21,10 +21,7 @@ public class PlayerDBManager : MonoBehaviour
     }
 
     public UserInfo userInfo { get; private set; }
-    //private void Start()
-    //{
-    //    userInfo = null;
-    //}
+
     public void UserInfoUpDate(UserInfo info)
     {
         if (info == null)
