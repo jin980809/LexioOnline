@@ -5,47 +5,56 @@ using System;
 public class UserInfo
 {
     public string userID;//유저 아이디
+    [NonSerialized] public string userPW;//유저 비밀번호
     public string userName;//유저 이름
     public int imageNum; //프로필 이미지
-    public float first;//총 1등 횟수
+    public float first;//1등 횟수
+    public float second; //2등 횟수
+    public float third;//3등 횟수
+    public float fourth; //4등 횟수
     public float playNum; //판수
-    public float winRate; //1등 확률
-    public float threePlayersPlayNum; //3인판 판수
-    public float threePlayersFirst; //3인판 1등 횟수
-    public float fourPlayersPlayNum; //4인판 판수
-    public float fourPlayersFirst; //4인판 1등 횟수
-    public float fivePlayersPlayNum; //5인판 판수
-    public float fivePlayersFirst; //5인판 1등 횟수
-    public float currentCoin; //현재 코인
-    public float maxCoin; //최대 코인
+    public float averageRank; //평균 등수
 
     public UserInfo() { }
-    public UserInfo(string _id, string _name, int _imageNum, float _first, float _winRate, float _playNum, float _threePlayersPlayNum, float _threePlayersFirst, float _fourPlayersPlayNum, float _fourPlayersFirst, float _fivePlayersPlayNum, float _fivePlayersFirst, float _currentCoin, float _maxCoin)
+    public UserInfo(string _id, string _pwd, string _name, int _imageNum, float _first, float _second, float _third, float _fourth, float _playNum, float _averageRank)
     {
         userID = _id;
+        userPW = _pwd;
         userName = _name;
         imageNum = _imageNum;
         first = _first;
-        winRate = _winRate; //1등 확률
+        second = _second;
+        third = _third;
+        fourth = _fourth;
         playNum = _playNum;
-        threePlayersPlayNum = _threePlayersPlayNum; //3인판 판수
-        threePlayersFirst = _threePlayersFirst; //3인판 1등 횟수
-        fourPlayersPlayNum = _fourPlayersPlayNum; //4인판 판수
-        fourPlayersFirst = _fourPlayersFirst; //4인판 1등 횟수
-        fivePlayersPlayNum = _fivePlayersPlayNum; //5인판 판수
-        fivePlayersFirst = _fivePlayersFirst; //5인판 1등 횟수
-        currentCoin = _currentCoin; //현재 코인
-        maxCoin = _maxCoin; //최대 코인
-}
+        averageRank = _averageRank;
+    }
     public void InfoFirstAdd()
     {
         playNum += 1;
         first += 1;
-        ProbabilityWinning();
+        AverageRankNew();
     }
-   
-    public void ProbabilityWinning()
+    public void InfoSecondAdd()
     {
-        winRate = first / playNum * 100;
+        playNum += 1;
+        second += 1;
+        AverageRankNew();
+    }
+    public void InfoThirdAdd()
+    {
+        playNum += 1;
+        third += 1;
+        AverageRankNew();
+    }
+    public void InfoFourthAdd()
+    {
+        playNum += 1;
+        fourth += 1;
+        AverageRankNew();
+    }
+    public void AverageRankNew()
+    {
+        averageRank = (first + 2 * second + 3 * third + 4 * fourth) / playNum;
     }
 }

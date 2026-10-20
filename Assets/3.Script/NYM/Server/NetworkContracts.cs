@@ -6,10 +6,11 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 3;
-    public const int RuleVersion = 1;
+    public const int ProtocolVersion = 6;
+    public const int RuleVersion = 2;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.
+    public const int EntryFee = 50; // 실제 경기 시작 때 참가자마다 currentCoin에서 한 번 차감
     public const int RoundCount = 5;
     public const int StartScore = 64;
     public const float TurnSeconds = 30f;
@@ -53,7 +54,8 @@ public enum AccountResultCode
     AlreadyLoggedIn,
     ServiceUnavailable, // DB 미준비·오류. 절대 성공으로 처리하지 않는다
     DuplicateNickname,
-    InvalidProfile
+    InvalidProfile,
+    InvalidRequest
 }
 
 public enum AccountOperation { Login, CheckId, Register, ChangePassword, DeleteAccount, UpdateProfile }
@@ -98,7 +100,9 @@ public enum RejectReason
     InvalidCombo,
     CannotBeat,
     PassOnEmptyFloor,
-    MatchEnded
+    MatchEnded,
+    InsufficientCoin,  // 입장료(EntryFee) 미만
+    ServiceUnavailable // DB 오류로 입장료 처리 실패
 }
 
 // ───────── 계정 (Authenticator NetworkMessage, 로그인 전) ─────────
@@ -126,16 +130,42 @@ public struct AccountResultMessage : NetworkMessage
     public PlayerProfile profile; // code == Success일 때만 유효
 }
 
-// 본인 전적. gamesPlayed == 0이면 averageRank는 무시하고 화면에 "—" 표시.
+// 본인 전적(DB userinfo). gamesPlayed == 0이면 winRate는 무시하고 화면에 "—" 표시.
 public struct PlayerProfile
 {
-    public string userId; // 계정 키 = 소문자로 정규화한 로그인 아이디 (DB user_id PK, 통합작업명세 v2.1)
+    public string userId; // 계정 키 = DB userinfo.userID
     public string nickname;
     public int profileImage;
-    public int wins;
-    public int losses;
-    public int gamesPlayed;
-    public float averageRank;
+    public int wins;        // first: 전체 1등(공동 포함) 횟수
+    public int gamesPlayed; // playNum: 전체 완료 판수
+    public float winRate;   // 0~100%
+    public int threePlayNum, threeFirst;
+    public int fourPlayNum, fourFirst;
+    public int fivePlayNum, fiveFirst;
+    public float currentCoin, maxCoin;
+}
+
+// 본인 전적 조회(인증 후). matchSize 0=전체(3/4/5 합산), 3/4/5=해당 모드. 최신순 최대 10개.
+public struct RecordQueryRequest : NetworkMessage
+{
+    public int requestId;
+    public int matchSize;
+}
+
+public struct RecordQueryResult : NetworkMessage
+{
+    public int requestId;
+    public int matchSize;
+    public AccountResultCode code; // Success가 아니면 records는 무시(빈 목록과 구분)
+    public GameRecordEntry[] records;
+}
+
+public struct GameRecordEntry
+{
+    public int matchSize;
+    public int rank;
+    public long playedAtUtcTicks; // DB time(UTC 저장). 화면은 new DateTime(ticks, DateTimeKind.Utc)→KST 변환
+    public int finalCoin;        // 정산 후 잔액
 }
 
 // ───────── 클라 → 서버 (Command 인자, 대기열은 NetworkMessage) ─────────
