@@ -128,7 +128,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
     }
 
     // [서버] 여러 계정 currentCoin에 delta를 한 트랜잭션으로 반영(입장료 -EntryFee, 복구 +EntryFee).
-    // 한 명이라도 계정 행 0/2개 이상·잔액 부족이면 아무도 바꾸지 않는다. reasons[i]=None이면 해당 계정 정상, profiles는 전원 성공 시 DB 재조회 값.
+    // 한 명이라도 계정 행 0/2개 이상이면 아무도 바꾸지 않는다. 잔액 부족은 막지 않음(2026-10-21 사용자 결정, 음수 잔액 허용). reasons[i]=None이면 해당 계정 정상, profiles는 전원 성공 시 DB 재조회 값.
     public async Task<(RejectReason[] reasons, PlayerProfile[] profiles)> ChangeCoins(string[] userIds, int delta)
     {
         try
@@ -168,7 +168,6 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         using (var reader = command.ExecuteReader())
                         {
                             if (!reader.Read() || reader.IsDBNull(0)) reasons[i] = RejectReason.ServiceUnavailable;
-                            else if (Convert.ToDouble(reader[0]) + delta < 0) reasons[i] = RejectReason.InsufficientCoin;
                             if (reader.Read()) reasons[i] = RejectReason.ServiceUnavailable;
                         }
                         ok &= reasons[i] == RejectReason.None;
@@ -192,19 +191,19 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
     }
 
     // [서버] 정상 완료 경기 저장(DB-20261020-04). 유효 참가자 전원의 userinfo 통계/토큰 UPDATE + 모드 전적 INSERT를 한 트랜잭션으로.
-    // currentCoin은 잠근 DB 값에 칩 증감만 더한다(입장료 재차감 없음). 실패하면 전부 롤백하고 null.
+    // currentCoin은 잠근 DB 값에 그 판 남은 칩(finalChips)을 더한다(입장료는 시작 때 차감). 전적 finalCoin에는 남은 칩을 저장(2026-10-21 사용자 결정). 실패하면 전부 롤백하고 null.
     // seatIndexes[i]=userIds[i]의 시작 좌석, participantImages=시작 좌석 순 원래 참가자 전원(이탈자 포함) 색상. 잘못된 스냅샷은 색상 열 0(미기록)으로 저장.
-    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc)
+    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc)
     {
         try
         {
             string connectionString = ConnectionString();
-            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, chipDeltas, seatIndexes, participantImages, finishedAtUtc, connectionString));
+            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, finalChips, seatIndexes, participantImages, finishedAtUtc, connectionString));
         }
         catch (Exception) { return null; }
     }
 
-    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc, string connectionString)
+    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc, string connectionString)
     {
         if (!LexioProtocol.IsValidMatchSize(matchSize)) return null;
         bool snapshot = participantImages != null && participantImages.Length == matchSize && Array.TrueForAll(participantImages, image => image >= 0 && image <= 5);
@@ -238,7 +237,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         else if (matchSize == 4) { modePlay = ++p.fourPlayNum; modeFirst = p.fourFirst += first ? 1 : 0; }
                         else { modePlay = ++p.fivePlayNum; modeFirst = p.fiveFirst += first ? 1 : 0; }
                         p.winRate = p.wins * 100f / p.gamesPlayed;
-                        p.currentCoin += chipDeltas[i]; // 음수 잔액도 그대로(임의 0 보정 없음)
+                        p.currentCoin += finalChips[i]; // 음수 잔액도 그대로(임의 0 보정 없음)
                         p.maxCoin = Math.Max(p.maxCoin, p.currentCoin);
 
                         command.Parameters.AddWithValue("@first", p.wins);
@@ -247,6 +246,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         command.Parameters.AddWithValue("@modePlay", modePlay);
                         command.Parameters.AddWithValue("@modeFirst", modeFirst);
                         command.Parameters.AddWithValue("@coin", p.currentCoin);
+                        command.Parameters.AddWithValue("@final", finalChips[i]);
                         command.Parameters.AddWithValue("@max", p.maxCoin);
                         command.Parameters.AddWithValue("@rank", ranks[i]);
                         command.Parameters.AddWithValue("@time", finishedAtUtc);
@@ -262,7 +262,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         }
                         for (int c = 0; c < stored.Length; c++) command.Parameters.AddWithValue("@p" + c, stored[c]);
                         command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin," + string.Join(",", ProfileImageColumns) +
-                            ") VALUES(@id,@rank,@time,@coin,@p0,@p1,@p2,@p3,@p4)";
+                            ") VALUES(@id,@rank,@time,@final,@p0,@p1,@p2,@p3,@p4)";
                         if (command.ExecuteNonQuery() != 1) return null;
                         profiles[i] = p;
                     }

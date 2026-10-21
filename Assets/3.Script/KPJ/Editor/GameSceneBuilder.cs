@@ -26,6 +26,9 @@ public class GameSceneBuilder
     private const string NymUiRootPath = "FrontendUI/UICanvas";
     // 매칭 인원 카드 이미지 (card_3p_default.png 등)
     private const string MatchCardFolder = "Assets/4.Sprite/LexioUI/match/";
+    // 전적 행 순위 배지 (rank_badge_1.png ~ rank_badge_5.png)와 행 배경
+    private const string RankBadgeFolder = "Assets/4.Sprite/LexioUI/result/";
+    private const string HistoryRowFolder = "Assets/4.Sprite/LexioUI/9slice/";
     // Mirror NetworkManager.HeadlessStartOptions.AutoStartServer
     private const int AutoStartServer = 1;
 
@@ -61,6 +64,7 @@ public class GameSceneBuilder
         "HistoryPopup/Window/Tabs/AllTab", "HistoryPopup/Window/Tabs/Tab3P", "HistoryPopup/Window/Tabs/Tab4P", "HistoryPopup/Window/Tabs/Tab5P",
         "LoginPage/LoginPanel/AccountDeleteLink", "LoginPage/LoginPanel/IdInput", "LoginPage/LoginPanel/PasswordChangeLink",
         "LoginPage/LoginPanel/SaveIdToggle", "MainPage/Menu/ExitButton", "MainPage/Menu/HistoryButton",
+        "MainPage/ProfileCard/IdText", "MainPage/ProfileCard/ChipText", "MyInfoPopup/Window/NicknameText",
         "MatchingPopup/Window/Slots/Slot0/Avatar", "MatchingPopup/Window/Slots/Slot0/NameText",
         "MyInfoPopup/Window/AccountDeleteButton", "MyInfoPopup/Window/AvatarEditButton", "MyInfoPopup/Window/BestChipStat/ValueText",
         "MyInfoPopup/Window/ChipBox/ChipText", "MyInfoPopup/Window/FirstPlaceStat/ValueText", "MyInfoPopup/Window/FirstRateStat/ValueText",
@@ -133,17 +137,23 @@ public class GameSceneBuilder
         GameObject gameCamera = FindRoot(targetScene, "Main Camera");
         GameObject lexioCanvas = FindRoot(targetScene, "LexioCanvas");
 
-        // 네트워크 매니저 (인증·매칭 포함)와 서버 주소 선택
+        // 네트워크 매니저 (인증·매칭 포함)와 서버 주소 선택 (NYM 씬에 서버 주소 선택이 이미 붙어 있으면 그대로 씀)
         manager = FindRoot(nymScene, "NetworkManager");
         SceneManager.MoveGameObjectToScene(manager, targetScene);
-        manager.AddComponent<ServerAddressSelector>();
+        if (manager.GetComponent<ServerAddressSelector>() == null)
+        {
+            manager.AddComponent<ServerAddressSelector>();
+        }
 
-        // NYM 계정·매칭 UI
-        GameObject nymLexioCanvas = FindRoot(nymScene, "LexioCanvas");
-        GameObject accountSystem = nymLexioCanvas.transform.Find("NYMMatchmakingUI").gameObject;
+        // NYM 계정·매칭 UI (NYM 계정 UI가 이미 붙어 있으면 그대로 씀)
+        GameObject accountSystem = FindAccountSystem(nymScene);
         MoveToTarget(accountSystem, null);
         accountSystem.name = "AccountSystem";
-        NYMAccountUI accountUi = accountSystem.AddComponent<NYMAccountUI>();
+        NYMAccountUI accountUi = accountSystem.GetComponent<NYMAccountUI>();
+        if (accountUi == null)
+        {
+            accountUi = accountSystem.AddComponent<NYMAccountUI>();
+        }
         ClearPopupBackdrop(accountSystem.GetComponent<NYMMatchmakingUI>());
 
         // 로그인~메인 화면 (3D 배경 포함)은 Frontend 아래로 모아 게임 중에 통째로 끔
@@ -203,6 +213,26 @@ public class GameSceneBuilder
         EditorSceneManager.CloseScene(guideScene, true);
         EditorSceneManager.MarkSceneDirty(targetScene);
         EditorSceneManager.SaveScene(targetScene);
+    }
+
+    // NYM 계정·매칭 UI 오브젝트. 지금 NYM 씬은 AccountSystem 루트(매칭 UI + 계정 UI)
+    // 예전 NYM 씬은 LexioCanvas 아래 NYMMatchmakingUI(매칭 UI만)
+    private GameObject FindAccountSystem(Scene nymScene)
+    {
+        GameObject result = null;
+        GameObject[] roots = nymScene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length && result == null; i++)
+        {
+            if (roots[i].name == "AccountSystem")
+            {
+                result = roots[i];
+            }
+        }
+        if (result == null)
+        {
+            result = FindRoot(nymScene, "LexioCanvas").transform.Find("NYMMatchmakingUI").gameObject;
+        }
+        return result;
     }
 
     private void SetupFrontendCamera(GameObject frontCamera, GameObject gameCamera)
@@ -352,6 +382,15 @@ public class GameSceneBuilder
         {
             mappedOwner = sharedCanvas.Find("SettingsPopup2").gameObject;
         }
+        else if (path.StartsWith("SharedCanvas/"))
+        {
+            // NYM 씬에도 설정 창·종료 확인용 SharedCanvas가 있음
+            Transform found = sharedCanvas.Find(path.Substring("SharedCanvas/".Length));
+            if (found != null)
+            {
+                mappedOwner = found.gameObject;
+            }
+        }
         else if (path == "LexioTable" || path == "BGCanvas")
         {
             mappedOwner = FindRoot(targetScene, path);
@@ -402,6 +441,15 @@ public class GameSceneBuilder
         account.FindProperty("settingsPopup").objectReferenceValue = null;
         // 메인 나가기 버튼은 KPJ 종료 확인 팝업을 띄움
         account.FindProperty("quitConfirmPopup").objectReferenceValue = FindUi(sharedCanvas, "QuitConfirmPopup");
+        // 전적 행은 순위에 맞는 배지와 배경으로 바뀜 (1위만 강조 배경)
+        SerializedProperty badges = account.FindProperty("rankBadgeSprites");
+        badges.arraySize = 5;
+        for (int i = 0; i < 5; i++)
+        {
+            badges.GetArrayElementAtIndex(i).objectReferenceValue = LoadSprite(RankBadgeFolder + "rank_badge_" + (i + 1) + ".png");
+        }
+        account.FindProperty("firstRowSprite").objectReferenceValue = LoadSprite(HistoryRowFolder + "row_first.png");
+        account.FindProperty("rowSprite").objectReferenceValue = LoadSprite(HistoryRowFolder + "row_white.png");
         account.ApplyModifiedPropertiesWithoutUndo();
 
         // 메인 프로필 카드의 닉네임은 NYM 닉네임 칸(GuestNicknameInput)이 보여 주므로 배치용 글자는 지움
@@ -431,6 +479,16 @@ public class GameSceneBuilder
         panels.GetArrayElementAtIndex(menuPopups.Length).objectReferenceValue = FindUi(sharedCanvas, "SettingsPopup2");
         panels.GetArrayElementAtIndex(menuPopups.Length + 1).objectReferenceValue = FindUi(sharedCanvas, "QuitConfirmPopup");
         matchmaking.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    private Sprite LoadSprite(string path)
+    {
+        Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (sprite == null)
+        {
+            problems.Add(path + " 없음");
+        }
+        return sprite;
     }
 
     private Sprite LoadCardSprite(int playerCount, string state)

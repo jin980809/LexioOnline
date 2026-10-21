@@ -13,6 +13,13 @@ public class NYMAccountUI : MonoBehaviour
     [SerializeField] GameObject settingsPopup;
     [Tooltip("메인 나가기 버튼이 띄울 종료 확인 팝업. 비우면 바로 종료 (2026-10-20 KPJ 요청·사용자 승인)")]
     [SerializeField] GameObject quitConfirmPopup;
+    [Header("전적 행 이미지 (비우면 씬 배치 그대로, 2026-10-21 KPJ 요청·사용자 승인)")]
+    [Tooltip("순위 배지 1위~5위 (rank_badge_1~5)")]
+    [SerializeField] Sprite[] rankBadgeSprites;
+    [Tooltip("1위 행 배경 (row_first)")]
+    [SerializeField] Sprite firstRowSprite;
+    [Tooltip("2위 이하 행 배경 (row_white)")]
+    [SerializeField] Sprite rowSprite;
 
     InputField signupId, signupNickname, signupPassword, signupConfirm;
     InputField changeId, currentPassword, newPassword, newConfirm, deleteId, deletePassword, editNickname;
@@ -346,14 +353,75 @@ public class NYMAccountUI : MonoBehaviour
             // KST는 서머타임이 없어 UTC+9 고정
             row.Find("DateText").GetComponent<Text>().text = new DateTime(record.playedAtUtcTicks, DateTimeKind.Utc).AddHours(9).ToString("MM.dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
             row.Find("Crown").gameObject.SetActive(record.rank == 1);
+            ShowRankImages(row, record.rank);
             ShowParticipants(row.Find("Players"), record.participantProfileImages);
             row.Find("RoundBadge/RoundText").GetComponent<Text>().text = LexioProtocol.RoundCount + "라운드";
-            row.Find("ChipDeltaText").GetComponent<Text>().text = record.finalCoin.ToString(); // 증감이 아니라 정산 후 잔액
+            ShowChipChange(row.Find("ChipDeltaText").GetComponent<Text>(), record.finalCoin);
         }
+        ShowHistorySummary(window.Find("SummaryText"), message);
         window.Find("Pager/PageText").GetComponent<Text>().text = (historyPage + 1) + " <color=#ADA5C4>/ " + pages + "</color>";
         window.Find("Pager/PrevButton").GetComponent<Button>().interactable = message == null && historyPage > 0;
         window.Find("Pager/NextButton").GetComponent<Button>().interactable = message == null && historyPage < pages - 1;
     }
+    // finalCoin=그 판 남은 칩. 시작 칩(50)과의 차이를 +는 초록, -는 빨강으로 표시 (2026-10-21 사용자 결정)
+    void ShowChipChange(Text text, int finalCoin)
+    {
+        int change = finalCoin - GameRules.StartingChips;
+        text.text = change.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture);
+        if (change > 0)
+        {
+            text.color = new Color32(0x2E, 0x9C, 0x45, 0xFF);
+        }
+        else if (change < 0)
+        {
+            text.color = new Color32(0xE3, 0x50, 0x3B, 0xFF);
+        }
+        else
+        {
+            text.color = new Color32(0x23, 0x15, 0x36, 0xFF);
+        }
+    }
+
+    // 순위 배지와 행 배경을 순위에 맞춤. 이미지가 비어 있으면 씬에 배치된 그대로 둔다.
+    void ShowRankImages(Transform row, int rank)
+    {
+        if (rankBadgeSprites != null && rank >= 1 && rank <= rankBadgeSprites.Length && rankBadgeSprites[rank - 1] != null)
+        {
+            row.Find("RankBadge").GetComponent<Image>().sprite = rankBadgeSprites[rank - 1];
+        }
+        Sprite background = rowSprite;
+        if (rank == 1)
+        {
+            background = firstRowSprite;
+        }
+        if (background != null)
+        {
+            row.GetComponent<Image>().sprite = background;
+        }
+    }
+
+    // 오른쪽 위 요약: 받은 전적(서버가 최근 10판까지 보냄) 기준 판 수와 1위 횟수. 안내 문구를 띄울 때는 비움.
+    void ShowHistorySummary(Transform summary, string message)
+    {
+        if (summary != null)
+        {
+            string text = "";
+            if (message == null)
+            {
+                int wins = 0;
+                for (int i = 0; i < history.Length; i++)
+                {
+                    if (history[i].rank == 1)
+                    {
+                        wins++;
+                    }
+                }
+                text = "최근 <color=#231536>" + history.Length + "판</color>   1위 <color=#231536>" + wins + "회</color>";
+            }
+            summary.GetComponent<Text>().text = text;
+        }
+    }
+
     // 서버가 검증한 스냅샷(길이3~5·값0~5)만 표시. null이면 과거 기록이라 숨김. 슬롯 Player0..4를 30 간격 가운데 정렬.
     void ShowParticipants(Transform players, int[] images)
     {

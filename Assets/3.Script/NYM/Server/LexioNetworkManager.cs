@@ -83,9 +83,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
         if (!LexioProtocol.IsValidMatchSize(request.matchSize)) return RejectReason.InvalidMatchSize;
         if (starting.Contains(conn) || saving.Contains(GetAccountKey(conn))) return RejectReason.AlreadyInMatch;
         if (queuedSize.ContainsKey(conn)) return RejectReason.AlreadyQueued; // 모드 변경은 취소 후 신청
-        // 미리 거르는 용도. 최종 잔액은 시작 직전 DB에서 다시 확인한다.
-        if (authenticator is NYMAccountAuthenticator && conn.authenticationData is PlayerProfile profile && profile.currentCoin < LexioProtocol.EntryFee)
-            return RejectReason.InsufficientCoin;
+        // 잔액이 입장료보다 적어도 매칭 가능 (2026-10-21 사용자 결정. 차감 후 잔액은 음수가 될 수 있음)
         if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
 
         queues[request.matchSize].Add(conn);
@@ -277,21 +275,22 @@ public class LexioNetworkManager : LexioTableNetworkManager
         if (valid.Count <= 2) return;
 
         string[] ids = new string[valid.Count];
-        int[] ranks = new int[valid.Count], deltas = new int[valid.Count];
+        int[] ranks = new int[valid.Count], finalChips = new int[valid.Count];
         for (int v = 0; v < valid.Count; v++)
         {
             int chips = seatInfos[valid[v]].chips;
             ids[v] = userIds[valid[v]];
-            deltas[v] = chips - table.StartingChips;
+            // 남은 칩 전부를 잔액에 더함(시작 때 입장료로 차감한 만큼 칩으로 돌려받는 셈, 음수면 그만큼 차감) (2026-10-21 사용자 결정)
+            finalChips[v] = chips;
             ranks[v] = 1 + valid.FindAll(other => seatInfos[other].chips > chips).Count;
         }
-        SaveMatch(userIds.Length, ids, ranks, deltas, valid.ToArray(), snapshot.images, accounts);
+        SaveMatch(userIds.Length, ids, ranks, finalChips, valid.ToArray(), snapshot.images, accounts);
     }
 
-    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, int[] seatIndexes, int[] images, NYMAccountAuthenticator accounts)
+    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] finalChips, int[] seatIndexes, int[] images, NYMAccountAuthenticator accounts)
     {
         foreach (string id in ids) saving.Add(id);
-        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, seatIndexes, images, DateTime.UtcNow);
+        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, finalChips, seatIndexes, images, DateTime.UtcNow);
         foreach (string id in ids) saving.Remove(id);
         if (profiles == null) { Debug.LogError("[LexioNetworkManager] 경기 결과 저장 실패: " + string.Join(",", ids)); return; }
         if (!NetworkServer.active) return;
