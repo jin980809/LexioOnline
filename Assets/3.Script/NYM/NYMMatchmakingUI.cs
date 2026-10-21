@@ -163,7 +163,11 @@ public class NYMMatchmakingUI : MonoBehaviour
         networkManager.PendingProfileImage = profile.profileImage;
         accountText.text = profile.userId;
         foreach (Image image in profileAvatars) if (image != null) image.sprite = Avatar(profile.profileImage);
+        var card = mainPage.transform.Find("ProfileCard");
+        card.Find("IdText").GetComponent<Text>().text = profile.userId;
+        card.Find("ChipText").GetComponent<Text>().text = profile.currentCoin.ToString("#,0.##");
         var window = accountText.transform.parent;
+        window.Find("NicknameText").GetComponent<Text>().text = profile.nickname;
         window.Find("TotalGamesStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed + "판";
         window.Find("FirstPlaceStat/ValueText").GetComponent<Text>().text = profile.wins + "회";
         window.Find("FirstRateStat/ValueText").GetComponent<Text>().text = profile.gamesPlayed == 0 ? "—" : profile.winRate.ToString("0.#") + "%";

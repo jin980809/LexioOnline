@@ -285,13 +285,13 @@ public class LexioNetworkManager : LexioTableNetworkManager
             deltas[v] = chips - table.StartingChips;
             ranks[v] = 1 + valid.FindAll(other => seatInfos[other].chips > chips).Count;
         }
-        SaveMatch(userIds.Length, ids, ranks, deltas, snapshot.images, accounts);
+        SaveMatch(userIds.Length, ids, ranks, deltas, valid.ToArray(), snapshot.images, accounts);
     }
 
-    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, int[] images, NYMAccountAuthenticator accounts)
+    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, int[] seatIndexes, int[] images, NYMAccountAuthenticator accounts)
     {
         foreach (string id in ids) saving.Add(id);
-        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, images, DateTime.UtcNow);
+        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, seatIndexes, images, DateTime.UtcNow);
         foreach (string id in ids) saving.Remove(id);
         if (profiles == null) { Debug.LogError("[LexioNetworkManager] 경기 결과 저장 실패: " + string.Join(",", ids)); return; }
         if (!NetworkServer.active) return;
