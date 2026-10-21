@@ -24,6 +24,9 @@ LexioOnline — Unity 6000.2.8f1 (URP) + Mirror 렉시오 멀티플레이.
 - server-keys.json 비밀키 파일은 Git 제외. 팀원은 서버 키를 별도로 준비하고 클라 신뢰 공개키/지문을 맞춘다.
 ## NYM 테스트 씬 최신화 기준
 
+- 2026-10-21 사용자 승인: 기존 NYM_Client_Scene을 KPJ/GameClient 최신 UI 구성으로 갱신하되 KPJ 원본·NYM 씬 GUID·인증/매칭 계약 보존. FrontendUI/UICanvas + 별도 AccountSystem·SharedCanvas·SoundManager·ScreenSettings·GuideManager 구성을 사용한다. 전적 참가자 색상은 DB-20261021-08 스냅샷/API 구현 후 연결하며 임의 색상 표시 금지.
+
 - NYM 서버/클라 Table 참조는 `Assets/2.Model/Prefabs/Network/NYM_LexioTable.prefab` 변형 사용. 공유 원본 prefab/GUID 유지. 변형에 NetworkMatch·64점·5라운드 설정, Player는 기존 원본 재사용. 원본에 NetworkMatch 추가 시 변형 중복 여부 확인.
-- NYM_Client_Scene은 최신 KPJ Client 기반 복제본. UI/View/ChipFlightView의 매니저 참조를 NYM 파생 매니저로 연결. 직렬화 필드 추가 시 복제본도 재연결.
+- NYM_Client_Scene은 UI·테스트 클라를 통합한 단일 작업 씬. FrontendUI(BackgroundCanvas·BackgroundTiles·UICanvas)에 메뉴/계정/매칭 화면, LexioCanvas에 게임/결과 UI. 전체 씬을 KPJ Client 복제로 덮어쓰지 말고 필요한 영역만 갱신. UI/LexioTableView/ChipFlightView/ActionBubbleView의 NYM 매니저·View·ResultPanelView 참조 유지. LexioUI.connectPanel=FrontendUI, NYMMatchmakingUI는 통합 UI의 버튼/패널 참조 사용. 계정/DB 미연결 기능을 인증 완료처럼 표시하지 않는다.
 - 빌드 목록은 NYM_Client(index0)·NYM_Server(index1) 모두 등록. 개별 빌드는 해당 씬만 명시. 구 실행 패키지의 검수 결과를 최신 씬 검수로 기록하지 않는다.
+- NYM 클라 Play는 테스트 씬 단독 로드. 다른 씬의 미저장 변경은 복구본 Save As Copy·재열기 검증 후 보존하고 닫는다. 검수 종료 전에도 활성 EventSystem·AudioListener 각1개와 Console 경고 재발 여부 확인. 런타임에서만 중복 객체를 끈 상태로 작업을 완료하지 않는다.

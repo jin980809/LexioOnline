@@ -45,8 +45,8 @@ public class LexioNetworkManager : LexioTableNetworkManager
     // 정원이 모여 입장료 DB 차감을 기다리는 연결. 이 동안 취소·재신청을 막는다.
     readonly HashSet<NetworkConnectionToClient> starting = new HashSet<NetworkConnectionToClient>();
     int startingMatches;
-    // 시작한 경기의 좌석별 계정(연결이 끊겨도 완료 저장에 필요). 저장을 시작하면 지운다.
-    readonly Dictionary<Guid, string[]> matchAccounts = new Dictionary<Guid, string[]>();
+    // 시작한 경기의 좌석별 계정·시작 시점 색상 스냅샷(연결이 끊겨도 완료 저장에 필요). 저장을 시작하면 지운다.
+    readonly Dictionary<Guid, (string[] userIds, int[] images)> matchAccounts = new Dictionary<Guid, (string[] userIds, int[] images)>();
     // 완료 저장 중인 계정. 저장 커밋 전 재매칭 차감과 순서가 섞이지 않도록 신청을 막는다.
     readonly HashSet<string> saving = new HashSet<string>();
 
@@ -225,7 +225,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
         {
             startingMatches--;
             matches[matchId] = seats;
-            if (accounts != null) matchAccounts[matchId] = userIds;
+            if (accounts != null) matchAccounts[matchId] = (userIds, Array.ConvertAll(profiles, profile => profile.profileImage)); // 차감 커밋 시점 DB 색상
             for (int i = 0; i < seats.Count; i++)
             {
                 starting.Remove(seats[i]);
@@ -265,9 +265,10 @@ public class LexioNetworkManager : LexioTableNetworkManager
     // shortcut: 이탈자 칩 고정·KPJ Aborted 전환(QA-20261020-02)은 KPJ 담당, 여기서는 저장 제외만 한다.
     void TrySaveMatch(Guid matchId)
     {
-        if (!matchAccounts.TryGetValue(matchId, out string[] userIds) || !matchTables.TryGetValue(matchId, out LexioTable table) ||
+        if (!matchAccounts.TryGetValue(matchId, out (string[] userIds, int[] images) snapshot) || !matchTables.TryGetValue(matchId, out LexioTable table) ||
             table == null || table.Phase != GamePhase.Finished || !(authenticator is NYMAccountAuthenticator accounts)) return;
         matchAccounts.Remove(matchId);
+        string[] userIds = snapshot.userIds;
 
         IReadOnlyList<SeatInfo> seatInfos = table.Seats;
         var valid = new List<int>();
@@ -284,13 +285,13 @@ public class LexioNetworkManager : LexioTableNetworkManager
             deltas[v] = chips - table.StartingChips;
             ranks[v] = 1 + valid.FindAll(other => seatInfos[other].chips > chips).Count;
         }
-        SaveMatch(userIds.Length, ids, ranks, deltas, accounts);
+        SaveMatch(userIds.Length, ids, ranks, deltas, snapshot.images, accounts);
     }
 
-    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, NYMAccountAuthenticator accounts)
+    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] deltas, int[] images, NYMAccountAuthenticator accounts)
     {
         foreach (string id in ids) saving.Add(id);
-        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, DateTime.UtcNow);
+        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, deltas, images, DateTime.UtcNow);
         foreach (string id in ids) saving.Remove(id);
         if (profiles == null) { Debug.LogError("[LexioNetworkManager] 경기 결과 저장 실패: " + string.Join(",", ids)); return; }
         if (!NetworkServer.active) return;

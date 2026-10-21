@@ -182,7 +182,7 @@ public class NYMMatchmakingUI : MonoBehaviour
         window.Find(row + "/Bar").GetComponent<Slider>().normalizedValue = games == 0 ? 0f : (float)first / games;
     }
 
-    Sprite Avatar(int index) => index >= 0 && index < avatarSprites.Length ? avatarSprites[index] : joinedSlotSprite;
+    public Sprite Avatar(int index) => index >= 0 && index < avatarSprites.Length ? avatarSprites[index] : joinedSlotSprite;
 
     public void Logout()
     {

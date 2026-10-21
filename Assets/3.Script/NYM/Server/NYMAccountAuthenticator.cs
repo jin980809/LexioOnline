@@ -193,19 +193,21 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
 
     // [서버] 정상 완료 경기 저장(DB-20261020-04). 유효 참가자 전원의 userinfo 통계/토큰 UPDATE + 모드 전적 INSERT를 한 트랜잭션으로.
     // currentCoin은 잠근 DB 값에 칩 증감만 더한다(입장료 재차감 없음). 실패하면 전부 롤백하고 null.
-    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, DateTime finishedAtUtc)
+    // participantImages: 시작 좌석 순 원래 참가자 전원(이탈자 포함) 색상 스냅샷. 모드 표에 profileImages 열이 있을 때만 저장(DB-20261021-08).
+    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] participantImages, DateTime finishedAtUtc)
     {
         try
         {
             string connectionString = ConnectionString();
-            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, chipDeltas, finishedAtUtc, connectionString));
+            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, chipDeltas, participantImages, finishedAtUtc, connectionString));
         }
         catch (Exception) { return null; }
     }
 
-    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, DateTime finishedAtUtc, string connectionString)
+    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] participantImages, DateTime finishedAtUtc, string connectionString)
     {
         if (!LexioProtocol.IsValidMatchSize(matchSize)) return null;
+        string images = ValidImages(participantImages, matchSize) ? string.Join(",", participantImages) : null; // 잘못된 스냅샷은 저장하지 않음(아이콘 미표시)
         string mode = matchSize == 3 ? "three" : matchSize == 4 ? "four" : "five";
         try
         {
@@ -216,6 +218,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 using (var command = connection.CreateCommand())
                 {
                     command.Transaction = transaction; command.CommandTimeout = 3;
+                    bool snapshotColumn = SnapshotTables(command).Contains(RecordTable(matchSize));
                     var profiles = new PlayerProfile[userIds.Length];
                     for (int i = 0; i < userIds.Length; i++)
                     {
@@ -251,7 +254,10 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         command.CommandText = "UPDATE userinfo SET first=@first,playNum=@play,winRate=@rate," + mode + "PlayersPlayNum=@modePlay," + mode +
                             "PlayersFirst=@modeFirst,currentCoin=@coin,maxCoin=@max WHERE userID=@id";
                         if (command.ExecuteNonQuery() != 1) return null;
-                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin) VALUES(@id,@rank,@time,@coin)";
+                        command.Parameters.AddWithValue("@images", (object)images ?? DBNull.Value);
+                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + (snapshotColumn
+                            ? "(userID,`rank`,`time`,finalCoin,profileImages) VALUES(@id,@rank,@time,@coin,@images)"
+                            : "(userID,`rank`,`time`,finalCoin) VALUES(@id,@rank,@time,@coin)");
                         if (command.ExecuteNonQuery() != 1) return null;
                         profiles[i] = p;
                     }
@@ -272,25 +278,48 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
 
     static string RecordTable(int matchSize) => matchSize == 3 ? "threepersons" : matchSize == 4 ? "fourpersons" : "fivepeople";
 
+    // 참가자 색상 열(profileImages)이 적용된 모드 표. 열은 DB 담당이 적용하며 서버가 자동 ALTER하지 않는다. 미적용 표는 기존 4열로만 읽고 쓴다.
+    static HashSet<string> SnapshotTables(MySqlCommand command)
+    {
+        command.CommandText = "SELECT TABLE_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND COLUMN_NAME='profileImages' AND TABLE_NAME IN ('threepersons','fourpersons','fivepeople')";
+        var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var reader = command.ExecuteReader()) while (reader.Read()) tables.Add(reader.GetString(0));
+        return tables;
+    }
+    static bool ValidImages(int[] images, int matchSize) => images != null && images.Length == matchSize && Array.TrueForAll(images, image => image >= 0 && image <= 5);
+    // 저장 형식 "0,3,3,5". 비었거나 형식/길이/범위가 틀리면 null(과거 기록과 같이 아이콘 미표시, 다른 값으로 대체하지 않음).
+    static int[] ParseImages(object value, int matchSize)
+    {
+        if (!(value is string text) || text.Length == 0) return null;
+        string[] parts = text.Split(',');
+        var images = new int[parts.Length];
+        for (int i = 0; i < parts.Length; i++)
+            if (!int.TryParse(parts[i], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out images[i])) return null;
+        return ValidImages(images, matchSize) ? images : null;
+    }
+
     // shortcut: 같은 time 행 순서는 미정, 고유키(DB-20261020-06) 계약 후 2차 정렬 추가.
     static RecordQueryResult QueryRecords(RecordQueryRequest request, string userId, string connectionString)
     {
         var result = new RecordQueryResult { requestId = request.requestId, matchSize = request.matchSize, code = AccountResultCode.InvalidRequest };
         if (request.matchSize != 0 && !LexioProtocol.IsValidMatchSize(request.matchSize)) return result;
-        var sql = new StringBuilder();
-        for (int size = 3; size <= 5; size++)
-        {
-            if (request.matchSize != 0 && request.matchSize != size) continue;
-            if (sql.Length > 0) sql.Append(" UNION ALL ");
-            sql.Append("SELECT ").Append(size).Append(",`rank`,`time`,finalCoin FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
-        }
-        sql.Append(" ORDER BY `time` DESC LIMIT 10");
         var records = new List<GameRecordEntry>();
         using (var connection = new MySqlConnection(connectionString))
         using (var command = connection.CreateCommand())
         {
             connection.Open();
-            command.CommandTimeout = 3; command.CommandText = sql.ToString();
+            command.CommandTimeout = 3;
+            HashSet<string> snapshotTables = SnapshotTables(command);
+            var sql = new StringBuilder();
+            for (int size = 3; size <= 5; size++)
+            {
+                if (request.matchSize != 0 && request.matchSize != size) continue;
+                if (sql.Length > 0) sql.Append(" UNION ALL ");
+                sql.Append("SELECT ").Append(size).Append(",`rank`,`time`,finalCoin,").Append(snapshotTables.Contains(RecordTable(size)) ? "profileImages" : "NULL")
+                    .Append(" FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
+            }
+            sql.Append(" ORDER BY `time` DESC LIMIT 10");
+            command.CommandText = sql.ToString();
             command.Parameters.AddWithValue("@id", userId);
             using (var reader = command.ExecuteReader()) while (reader.Read())
             {
@@ -299,7 +328,8 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 records.Add(new GameRecordEntry
                 {
                     matchSize = Convert.ToInt32(reader[0]), rank = Convert.ToInt32(reader[1]),
-                    playedAtUtcTicks = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc).Ticks, finalCoin = Convert.ToInt32(reader[3])
+                    playedAtUtcTicks = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc).Ticks, finalCoin = Convert.ToInt32(reader[3]),
+                    participantProfileImages = ParseImages(reader[4], Convert.ToInt32(reader[0]))
                 });
             }
         }
