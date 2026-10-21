@@ -12,6 +12,9 @@ using Mirror.Transports.Encryption;
 using MySql.Data.MySqlClient;
 using UnityEngine;
 
+// 서버 정산 DB 호출 결과(네트워크 미전송). Unavailable만 재시도한다.
+public enum SettlementOutcome { Applied, AlreadyApplied, Rejected, Unavailable }
+
 // NYM 계정 경계. DB/비밀번호는 서버에서 처리하고 공개 프로필만 전송한다.
 public class NYMAccountAuthenticator : NetworkAuthenticator
 {
@@ -127,16 +130,72 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
         if (Current(conn)) conn.Send(result);
     }
 
-    // [서버] 여러 계정 currentCoin에 delta를 한 트랜잭션으로 반영(입장료 -EntryFee, 복구 +EntryFee).
-    // 한 명이라도 계정 행 0/2개 이상이면 아무도 바꾸지 않는다. 잔액 부족은 막지 않음(2026-10-21 사용자 결정, 음수 잔액 허용). reasons[i]=None이면 해당 계정 정상, profiles는 전원 성공 시 DB 재조회 값.
-    public async Task<(RejectReason[] reasons, PlayerProfile[] profiles)> ChangeCoins(string[] userIds, int delta)
+    // [서버] 경기 입장료 차감. 같은 matchId 원장(matchsettlement kind1)이 이미 있는 계정은 다시 차감하지 않는다(응답 유실 후 재호출 안전).
+    // 한 명이라도 계정 행 0/2개 이상이면 아무도 바꾸지 않는다. 잔액 부족은 막지 않음(2026-10-21 사용자 결정, 음수 잔액 허용·0 보정 없음). reasons[i]=None이면 해당 계정 정상, profiles는 전원 성공 시 DB 재조회 값.
+    public async Task<(RejectReason[] reasons, PlayerProfile[] profiles)> ChargeEntryFee(Guid matchId, string[] userIds)
     {
         try
         {
             string connectionString = ConnectionString();
-            return await Task.Run(() => ChangeCoins(userIds, delta, connectionString));
+            return await Task.Run(() => ChargeEntryFee(matchId.ToString("D"), userIds, connectionString));
         }
         catch (Exception) { return (Unavailable(userIds.Length), null); }
+    }
+
+    // [서버] 시작하지 못한 경기 입장료 환불. 원장에 차감(kind1)이 있고 환불(kind2)·완료(kind3)가 없는 계정만 +EntryFee, 1회만.
+    // 차감이 커밋되지 않았던 계정은 아무것도 안 함. 탈퇴 등으로 계정 행이 없으면 그 계정만 건너뛴다.
+    public async Task<SettlementOutcome> RefundEntryFee(Guid matchId, string[] userIds)
+    {
+        try
+        {
+            string connectionString = ConnectionString();
+            return await Task.Run(() => RefundEntryFee(matchId.ToString("D"), userIds, connectionString));
+        }
+        catch (Exception) { return SettlementOutcome.Unavailable; }
+    }
+
+    static SettlementOutcome RefundEntryFee(string matchId, string[] userIds, string connectionString)
+    {
+        try
+        {
+            using (var connection = new MySqlConnection(connectionString))
+            {
+                connection.Open();
+                using (var transaction = connection.BeginTransaction(System.Data.IsolationLevel.Serializable))
+                using (var command = connection.CreateCommand())
+                {
+                    command.Transaction = transaction; command.CommandTimeout = 3;
+                    command.Parameters.AddWithValue("@match", matchId);
+                    command.Parameters.AddWithValue("@fee", LexioProtocol.EntryFee);
+                    var id = command.Parameters.Add("@id", MySqlDbType.VarChar);
+                    foreach (string userId in userIds)
+                    {
+                        id.Value = userId;
+                        var kinds = LedgerKinds(command);
+                        if (!kinds.Contains(LedgerDebit) || kinds.Contains(LedgerRefund) || kinds.Contains(LedgerComplete)) continue;
+                        command.CommandText = "UPDATE userinfo SET currentCoin=currentCoin+@fee WHERE userID=@id";
+                        if (command.ExecuteNonQuery() != 1) continue;
+                        command.CommandText = "INSERT INTO matchsettlement(matchId,userID,kind,amount,`time`) VALUES(@match,@id," + LedgerRefund + ",@fee,UTC_TIMESTAMP())";
+                        command.ExecuteNonQuery();
+                    }
+                    transaction.Commit();
+                    return SettlementOutcome.Applied;
+                }
+            }
+        }
+        catch (Exception) { return SettlementOutcome.Unavailable; }
+    }
+
+    // 정산 원장 matchsettlement(matchId, userID, kind) PK. kind 1=입장료 차감, 2=환불, 3=완료 정산.
+    const int LedgerDebit = 1, LedgerRefund = 2, LedgerComplete = 3;
+
+    // command에 @match·@id가 있어야 한다. 해당 계정·경기의 원장 kind 목록(잠금).
+    static HashSet<int> LedgerKinds(MySqlCommand command)
+    {
+        command.CommandText = "SELECT kind FROM matchsettlement WHERE matchId=@match AND userID=@id FOR UPDATE";
+        var kinds = new HashSet<int>();
+        using (var reader = command.ExecuteReader()) while (reader.Read()) kinds.Add(Convert.ToInt32(reader[0]));
+        return kinds;
     }
 
     static RejectReason[] Unavailable(int count)
@@ -146,7 +205,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
         return reasons;
     }
 
-    static (RejectReason[] reasons, PlayerProfile[] profiles) ChangeCoins(string[] userIds, int delta, string connectionString)
+    static (RejectReason[] reasons, PlayerProfile[] profiles) ChargeEntryFee(string matchId, string[] userIds, string connectionString)
     {
         var reasons = new RejectReason[userIds.Length];
         try
@@ -159,7 +218,8 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 {
                     command.Transaction = transaction; command.CommandTimeout = 3;
                     var id = command.Parameters.Add("@id", MySqlDbType.VarChar);
-                    command.Parameters.AddWithValue("@delta", delta);
+                    command.Parameters.AddWithValue("@match", matchId);
+                    command.Parameters.AddWithValue("@delta", -LexioProtocol.EntryFee);
                     bool ok = true;
                     for (int i = 0; i < userIds.Length; i++)
                     {
@@ -177,8 +237,13 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                     for (int i = 0; i < userIds.Length; i++)
                     {
                         id.Value = userIds[i];
-                        command.CommandText = "UPDATE userinfo SET currentCoin=currentCoin+@delta WHERE userID=@id";
-                        if (command.ExecuteNonQuery() != 1) return (Unavailable(userIds.Length), null);
+                        if (LedgerKinds(command).Count == 0) // 이미 차감된 계정(같은 경기 재호출)은 원장·잔액 그대로
+                        {
+                            command.CommandText = "UPDATE userinfo SET currentCoin=currentCoin+@delta WHERE userID=@id";
+                            if (command.ExecuteNonQuery() != 1) return (Unavailable(userIds.Length), null);
+                            command.CommandText = "INSERT INTO matchsettlement(matchId,userID,kind,amount,`time`) VALUES(@match,@id," + LedgerDebit + ",@delta,UTC_TIMESTAMP())";
+                            command.ExecuteNonQuery();
+                        }
                         command.CommandText = "SELECT " + ProfileColumns + " FROM userinfo WHERE userID=@id";
                         using (var reader = command.ExecuteReader()) { reader.Read(); profiles[i] = ReadProfile(reader); }
                     }
@@ -191,21 +256,24 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
     }
 
     // [서버] 정상 완료 경기 저장(DB-20261020-04). 유효 참가자 전원의 userinfo 통계/토큰 UPDATE + 모드 전적 INSERT를 한 트랜잭션으로.
-    // currentCoin은 잠근 DB 값에 그 판 남은 칩(finalChips)을 더한다(입장료는 시작 때 차감). 전적 finalCoin에는 남은 칩을 저장(2026-10-21 사용자 결정). 실패하면 전부 롤백하고 null.
+    // currentCoin은 잠근 DB 값에 그 판 남은 칩(finalChips)을 더한다(입장료는 시작 때 차감). 전적 finalCoin에는 남은 칩을 저장(2026-10-21 사용자 결정)하고 chipFormat=1로 표시.
     // seatIndexes[i]=userIds[i]의 시작 좌석, participantImages=시작 좌석 순 원래 참가자 전원(이탈자 포함) 색상. 잘못된 스냅샷은 색상 열 0(미기록)으로 저장.
-    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc)
+    // 같은 matchId 완료 원장(kind3)이 이미 있으면 AlreadyApplied(커밋 후 응답 유실 재시도). 차감 원장이 없거나 환불됐거나 계정/값이 잘못되면 Rejected(재시도 안 함), DB 오류는 Unavailable(재시도).
+    public async Task<(SettlementOutcome outcome, PlayerProfile[] profiles)> SaveMatch(Guid matchId, int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc)
     {
         try
         {
             string connectionString = ConnectionString();
-            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, finalChips, seatIndexes, participantImages, finishedAtUtc, connectionString));
+            return await Task.Run(() => SaveMatch(matchId.ToString("D"), matchSize, userIds, ranks, finalChips, seatIndexes, participantImages, finishedAtUtc, connectionString));
         }
-        catch (Exception) { return null; }
+        catch (Exception) { return (SettlementOutcome.Unavailable, null); }
     }
 
-    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc, string connectionString)
+    static (SettlementOutcome, PlayerProfile[]) SaveMatch(string matchId, int matchSize, string[] userIds, int[] ranks, int[] finalChips, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc, string connectionString)
     {
-        if (!LexioProtocol.IsValidMatchSize(matchSize)) return null;
+        int count = userIds == null ? 0 : userIds.Length;
+        if (!LexioProtocol.IsValidMatchSize(matchSize) || count == 0 || count > matchSize || ranks == null || ranks.Length != count || finalChips == null || finalChips.Length != count ||
+            seatIndexes == null || seatIndexes.Length != count || !Array.TrueForAll(seatIndexes, seat => seat >= 0 && seat < matchSize)) return (SettlementOutcome.Rejected, null);
         bool snapshot = participantImages != null && participantImages.Length == matchSize && Array.TrueForAll(participantImages, image => image >= 0 && image <= 5);
         string mode = matchSize == 3 ? "three" : matchSize == 4 ? "four" : "five";
         try
@@ -217,18 +285,28 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 using (var command = connection.CreateCommand())
                 {
                     command.Transaction = transaction; command.CommandTimeout = 3;
+                    command.Parameters.AddWithValue("@match", matchId);
+                    var id = command.Parameters.Add("@id", MySqlDbType.VarChar);
+                    foreach (string userId in userIds)
+                    {
+                        id.Value = userId;
+                        var kinds = LedgerKinds(command);
+                        if (kinds.Contains(LedgerComplete)) return (SettlementOutcome.AlreadyApplied, null); // 한 트랜잭션이라 한 명이라도 있으면 전원 반영된 것
+                        if (!kinds.Contains(LedgerDebit) || kinds.Contains(LedgerRefund)) return (SettlementOutcome.Rejected, null);
+                    }
                     var profiles = new PlayerProfile[userIds.Length];
                     for (int i = 0; i < userIds.Length; i++)
                     {
                         command.Parameters.Clear();
+                        command.Parameters.AddWithValue("@match", matchId);
                         command.Parameters.AddWithValue("@id", userIds[i]);
                         command.CommandText = "SELECT " + ProfileColumns + " FROM userinfo WHERE userID=@id LIMIT 2 FOR UPDATE";
                         PlayerProfile p;
                         using (var reader = command.ExecuteReader())
                         {
-                            if (!reader.Read()) return null;
+                            if (!reader.Read()) return (SettlementOutcome.Rejected, null);
                             p = ReadProfile(reader);
-                            if (reader.Read()) return null; // 같은 계정 행 2개 이상
+                            if (reader.Read()) return (SettlementOutcome.Rejected, null); // 같은 계정 행 2개 이상
                         }
                         bool first = ranks[i] == 1;
                         p.gamesPlayed++; if (first) p.wins++;
@@ -252,7 +330,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         command.Parameters.AddWithValue("@time", finishedAtUtc);
                         command.CommandText = "UPDATE userinfo SET first=@first,playNum=@play,winRate=@rate," + mode + "PlayersPlayNum=@modePlay," + mode +
                             "PlayersFirst=@modeFirst,currentCoin=@coin,maxCoin=@max WHERE userID=@id";
-                        if (command.ExecuteNonQuery() != 1) return null;
+                        if (command.ExecuteNonQuery() != 1) return (SettlementOutcome.Rejected, null);
                         // 색상 열은 색상+1 저장(0=미기록·기존 행 기본값). myProfile=본인, anotherProfile*=나머지 좌석 순, 빈 칸 0.
                         var stored = new int[ProfileImageColumns.Length];
                         if (snapshot)
@@ -261,17 +339,20 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                             for (int seat = 0, other = 1; seat < matchSize; seat++) if (seat != seatIndexes[i]) stored[other++] = participantImages[seat] + 1;
                         }
                         for (int c = 0; c < stored.Length; c++) command.Parameters.AddWithValue("@p" + c, stored[c]);
-                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin," + string.Join(",", ProfileImageColumns) +
-                            ") VALUES(@id,@rank,@time,@final,@p0,@p1,@p2,@p3,@p4)";
-                        if (command.ExecuteNonQuery() != 1) return null;
+                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin,chipFormat," + string.Join(",", ProfileImageColumns) +
+                            ") VALUES(@id,@rank,@time,@final,1,@p0,@p1,@p2,@p3,@p4)";
+                        if (command.ExecuteNonQuery() != 1) return (SettlementOutcome.Rejected, null);
+                        command.CommandText = "INSERT INTO matchsettlement(matchId,userID,kind,amount,`time`) VALUES(@match,@id," + LedgerComplete + ",@final,@time)";
+                        command.ExecuteNonQuery();
                         profiles[i] = p;
                     }
                     transaction.Commit();
-                    return profiles;
+                    return (SettlementOutcome.Applied, profiles);
                 }
             }
         }
-        catch (Exception) { return null; }
+        catch (InvalidDataException) { return (SettlementOutcome.Rejected, null); } // userinfo 통계 값 오류
+        catch (Exception) { return (SettlementOutcome.Unavailable, null); }
     }
 
     // [서버] 서버에서 바뀐 프로필(코인 등)을 클라에 보낸다. 기존 UpdateProfile 응답 경로 재사용, requestId 0은 UI 요청 응답과 겹치지 않는다.
@@ -298,7 +379,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
         return images;
     }
 
-    // shortcut: 같은 time 행 순서는 미정, 고유키(DB-20261020-06) 계약 후 2차 정렬 추가.
+    // 선택 범위(전체=3테이블 UNION) 전체에서 최신 20건. 같은 시각은 recordId·인원 역순으로 고정.
     static RecordQueryResult QueryRecords(RecordQueryRequest request, string userId, string connectionString)
     {
         var result = new RecordQueryResult { requestId = request.requestId, matchSize = request.matchSize, code = AccountResultCode.InvalidRequest };
@@ -308,10 +389,10 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
         {
             if (request.matchSize != 0 && request.matchSize != size) continue;
             if (sql.Length > 0) sql.Append(" UNION ALL ");
-            sql.Append("SELECT ").Append(size).Append(",`rank`,`time`,finalCoin,").Append(string.Join(",", ProfileImageColumns))
-                .Append(" FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
+            sql.Append("SELECT ").Append(size).Append(" AS matchSize,`rank`,`time`,finalCoin,").Append(string.Join(",", ProfileImageColumns))
+                .Append(",chipFormat,recordId FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
         }
-        sql.Append(" ORDER BY `time` DESC LIMIT 10");
+        sql.Append(" ORDER BY `time` DESC,recordId DESC,matchSize DESC LIMIT 20");
         var records = new List<GameRecordEntry>();
         using (var connection = new MySqlConnection(connectionString))
         using (var command = connection.CreateCommand())
@@ -327,6 +408,7 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 {
                     matchSize = Convert.ToInt32(reader[0]), rank = Convert.ToInt32(reader[1]),
                     playedAtUtcTicks = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc).Ticks, finalCoin = Convert.ToInt32(reader[3]),
+                    chipsKnown = Convert.ToInt32(reader[4 + ProfileImageColumns.Length]) == 1,
                     participantProfileImages = ReadProfileImages(reader, 4, Convert.ToInt32(reader[0]))
                 });
             }

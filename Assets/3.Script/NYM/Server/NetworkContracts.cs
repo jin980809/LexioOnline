@@ -6,7 +6,7 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 8; // 8: 전적 참가자 색상 participantProfileImages (PROFILE-01). 7: 시작 점수 64→50
+    public const int ProtocolVersion = 9; // 9: 전적 chipsKnown·최근20판·RejectReason.SettlementPending. 8: 전적 참가자 색상 participantProfileImages (PROFILE-01). 7: 시작 점수 64→50
     public const int RuleVersion = 2;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.
@@ -101,8 +101,9 @@ public enum RejectReason
     CannotBeat,
     PassOnEmptyFloor,
     MatchEnded,
-    InsufficientCoin,  // 입장료(EntryFee) 미만
-    ServiceUnavailable // DB 오류로 입장료 처리 실패
+    InsufficientCoin,  // 미사용(음수 잔액도 매칭 허용, 2026-10-21 사용자 결정). 값 순서 유지용
+    ServiceUnavailable, // DB 오류로 입장료 처리 실패
+    SettlementPending  // 이전 경기 정산(완료 저장·입장료 환불) 재시도 대기 중
 }
 
 // ───────── 계정 (Authenticator NetworkMessage, 로그인 전) ─────────
@@ -145,7 +146,7 @@ public struct PlayerProfile
     public float currentCoin, maxCoin;
 }
 
-// 본인 전적 조회(인증 후). matchSize 0=전체(3/4/5 합산), 3/4/5=해당 모드. 최신순 최대 10개.
+// 본인 전적 조회(인증 후). matchSize 0=전체(3/4/5 합산), 3/4/5=해당 모드. 선택 범위 전체에서 최신순 최대 20개.
 public struct RecordQueryRequest : NetworkMessage
 {
     public int requestId;
@@ -165,7 +166,8 @@ public struct GameRecordEntry
     public int matchSize;
     public int rank;
     public long playedAtUtcTicks; // DB time(UTC 저장). 화면은 new DateTime(ticks, DateTimeKind.Utc)→KST 변환
-    public int finalCoin;        // 정산 후 잔액
+    public int finalCoin;        // chipsKnown이면 그 판 남은 칩(증감 = finalCoin - 시작 칩50). 아니면 의미 미확인(과거 잔액형 등)이라 표시에 쓰지 않는다
+    public bool chipsKnown;      // DB chipFormat=1
     public int[] participantProfileImages; // 경기 참가자 색상(0~5, 길이=matchSize, [0]=본인·나머지 좌석 순, 이탈자 포함). null=스냅샷 없는 과거 기록
 }
 

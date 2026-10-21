@@ -354,6 +354,11 @@ public class NYMMatchmakingUI : MonoBehaviour
 
     void OnQueueResult(RequestResult result)
     {
+        if (result.requestId == 0 && result.reason == RejectReason.MatchEnded) // 서버 통보: 경기 중 인원 부족으로 중단
+        {
+            message = "참가자가 2명 이하로 줄어 경기가 중단되었습니다. 입장료는 반환되지 않습니다.";
+            return;
+        }
         if (matchSize == 0 || !joinSent) return;
         if (result.requestId == 0) // 서버 통보: 정원은 모였지만 입장료 처리 실패
         {
@@ -391,6 +396,7 @@ public class NYMMatchmakingUI : MonoBehaviour
     {
         if (reason == RejectReason.InsufficientCoin) return string.Format("토큰이 부족합니다. 경기 입장에 {0} 토큰이 필요합니다.", LexioProtocol.EntryFee);
         if (reason == RejectReason.ServiceUnavailable) return "서버 DB 오류로 경기를 시작하지 못했습니다. 다시 시도하세요.";
+        if (reason == RejectReason.SettlementPending) return "이전 경기 정산을 처리하는 중입니다. 잠시 후 다시 시도하세요.";
         return "매칭 신청이 거절되었습니다. 다시 선택하세요.";
     }
 

@@ -221,7 +221,9 @@ public class ChipFlightView : MonoBehaviour
             {
                 int receiver = settleOrder[receiverIndex];
                 int amount = table.Seats[payer].settleCount - table.Seats[receiver].settleCount;
-                if (amount > 0)
+                // 게임 도중 나간 자리(isAi)는 정산 제외·칩 고정
+                bool hasLeaver = table.Seats[payer].isAi || table.Seats[receiver].isAi;
+                if (amount > 0 && hasLeaver == false)
                 {
                     AddPairFlights(payer, receiver, amount);
                 }

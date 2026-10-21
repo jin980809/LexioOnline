@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Mirror;
@@ -25,6 +26,10 @@ public class LexioNetworkManager : LexioTableNetworkManager
     [Tooltip("경기마다 하나씩 생성할 테이블 프리팹. NetworkMatch 컴포넌트 필요(Player Prefab도 동일)")]
     [SerializeField] LexioTable matchTablePrefab;
 
+    [Header("렉시오 정산 복구")]
+    [Tooltip("비우면 persistentDataPath/settlement-journal.json. 입장료 환불·완료 저장이 DB 오류·서버 재시작 뒤에도 한 번만 반영되도록 미완 정산을 보관")]
+    [SerializeField] string settlementJournalPath = "";
+
     [Header("렉시오 테스트")]
     [Tooltip("0이 아니면 클라 접속 직후 이 인원(3/4/5) 대기열에 자동 신청. 매칭 UI 연결 전 테스트용")]
     [SerializeField] int autoJoinMatchSize;
@@ -45,10 +50,29 @@ public class LexioNetworkManager : LexioTableNetworkManager
     // 정원이 모여 입장료 DB 차감을 기다리는 연결. 이 동안 취소·재신청을 막는다.
     readonly HashSet<NetworkConnectionToClient> starting = new HashSet<NetworkConnectionToClient>();
     int startingMatches;
-    // 시작한 경기의 좌석별 계정·시작 시점 색상 스냅샷(연결이 끊겨도 완료 저장에 필요). 저장을 시작하면 지운다.
-    readonly Dictionary<Guid, (string[] userIds, int[] images)> matchAccounts = new Dictionary<Guid, (string[] userIds, int[] images)>();
-    // 완료 저장 중인 계정. 저장 커밋 전 재매칭 차감과 순서가 섞이지 않도록 신청을 막는다.
-    readonly HashSet<string> saving = new HashSet<string>();
+    // 정산 저널(서버 로컬 JSON). DB 원장 matchsettlement가 같은 matchId 중복 반영을 막고, 저널은 해야 할 환불·완료 저장을 재시작 뒤에도 잃지 않게 보관한다.
+    [Serializable]
+    class Settlement
+    {
+        public string matchId;
+        public int state;         // SettlementStarting·Started·Finished·Failed
+        public int matchSize;
+        public string[] userIds;  // Starting/Started: 시작 좌석 순 계정. Finished: 저장 대상(유효 참가자)
+        public int[] images;      // 시작 좌석 순 색상 스냅샷(이탈자 포함)
+        public int[] ranks, finalChips, seatIndexes;
+        public long finishedAtUtcTicks;
+    }
+
+    [Serializable]
+    class SettlementJournal { public List<Settlement> entries = new List<Settlement>(); }
+
+    // Starting=차감 중/시작 전(남아 있으면 환불), Started=경기 중(중단 시 입장료 유지), Finished=완료 결과 확정(저장 재시도), Failed=영구 거절(운영 확인용 보관)
+    const int SettlementStarting = 0, SettlementStarted = 1, SettlementFinished = 2, SettlementFailed = 3;
+    readonly Dictionary<string, Settlement> settlements = new Dictionary<string, Settlement>();
+    // DB 반영을 기다리는 정산(Starting=환불, Finished=완료 저장). 해당 계정은 재매칭을 막는다.
+    readonly Dictionary<string, (float at, int attempts)> retries = new Dictionary<string, (float at, int attempts)>();
+    readonly HashSet<string> settling = new HashSet<string>(); // DB 호출 중
+    bool journalReadable = true; // 읽기 실패한 저널은 덮어쓰지 않는다(새 경기 시작도 막힘)
 
     int nextRequestId;
 
@@ -81,7 +105,8 @@ public class LexioNetworkManager : LexioTableNetworkManager
     {
         if (!conn.isAuthenticated || GetAccountKey(conn) == null) return RejectReason.NotLoggedIn;
         if (!LexioProtocol.IsValidMatchSize(request.matchSize)) return RejectReason.InvalidMatchSize;
-        if (starting.Contains(conn) || saving.Contains(GetAccountKey(conn))) return RejectReason.AlreadyInMatch;
+        if (starting.Contains(conn)) return RejectReason.AlreadyInMatch;
+        if (HasPendingSettlement(GetAccountKey(conn))) return RejectReason.SettlementPending;
         if (queuedSize.ContainsKey(conn)) return RejectReason.AlreadyQueued; // 모드 변경은 취소 후 신청
         // 잔액이 입장료보다 적어도 매칭 가능 (2026-10-21 사용자 결정. 차감 후 잔액은 음수가 될 수 있음)
         if (connectionMatch.ContainsKey(conn) && !LeaveFinishedMatch(conn)) return RejectReason.AlreadyInMatch;
@@ -133,7 +158,12 @@ public class LexioNetworkManager : LexioTableNetworkManager
     {
         if (!matches.TryGetValue(matchId, out List<NetworkConnectionToClient> seats)) return;
         TrySaveMatch(matchId); // 결과 확정 직후 전원이 나가도 저장을 잃지 않게 테이블 파괴 전에 확인
-        matchAccounts.Remove(matchId); // 미완료(전원 이탈 등)는 저장 없음
+        // 미완료(전원 이탈 등)는 Aborted: 입장료 유지, 완료 정산 없음
+        if (settlements.TryGetValue(matchId.ToString("D"), out Settlement settlement) && settlement.state == SettlementStarted)
+        {
+            settlements.Remove(settlement.matchId);
+            SaveJournal();
+        }
         foreach (NetworkConnectionToClient seatConn in seats)
             if (seatConn != null) connectionMatch.Remove(seatConn);
         matches.Remove(matchId);
@@ -205,9 +235,9 @@ public class LexioNetworkManager : LexioTableNetworkManager
         }
     }
 
-    // 참가자 전원 입장료를 한 트랜잭션으로 차감한 뒤에만 시작한다. 실패하면 아무도 차감되지 않고,
-    // 부족/DB 오류 계정은 거절 알림, 나머지는 원래 순서로 대기열 앞에 되돌린다.
-    // shortcut: 차감 후 시작 전 연결 해제 시 복구는 메모리 상태 기준 1회 보상 UPDATE. 서버 재시작/복구 실패 대비 영속 원장은 DB-20261020-06 계약 후 추가.
+    // 참가자 전원 입장료를 같은 matchId 원장으로 한 트랜잭션 차감한 뒤에만 시작한다(음수 잔액 허용).
+    // 시작하지 못하면 같은 matchId로 환불(차감이 없었으면 아무것도 안 함). 실패 계정은 거절 알림, 나머지는 원래 순서로 대기열 앞에 되돌린다.
+    // 환불이 DB 오류로 미뤄지면 재시도 목록에 넣고, 정산이 끝날 때까지 해당 계정의 매칭을 막는다.
     async void ChargeAndStart(Guid matchId, int matchSize, List<NetworkConnectionToClient> seats)
     {
         startingMatches++;
@@ -215,64 +245,105 @@ public class LexioNetworkManager : LexioTableNetworkManager
         string[] userIds = seats.ConvertAll(GetAccountKey).ToArray();
         RejectReason[] reasons = null;
         PlayerProfile[] profiles = null;
-        if (accounts != null) (reasons, profiles) = await accounts.ChangeCoins(userIds, -LexioProtocol.EntryFee);
-
-        bool charged = reasons == null || Array.TrueForAll(reasons, reason => reason == RejectReason.None);
-        bool[] connected = seats.ConvertAll(IsConnected).ToArray();
-        if (charged && Array.TrueForAll(connected, value => value))
+        Settlement settlement = null;
+        if (accounts != null)
         {
-            startingMatches--;
-            matches[matchId] = seats;
-            if (accounts != null) matchAccounts[matchId] = (userIds, Array.ConvertAll(profiles, profile => profile.profileImage)); // 차감 커밋 시점 DB 색상
-            for (int i = 0; i < seats.Count; i++)
-            {
-                starting.Remove(seats[i]);
-                connectionMatch[seats[i]] = matchId;
-                if (profiles != null) accounts.SendProfile(seats[i], profiles[i]);
-            }
-            StartMatch(matchId, seats);
-            return;
-        }
-
-        if (charged && accounts != null)
-        {
-            (RejectReason[] refund, _) = await accounts.ChangeCoins(userIds, LexioProtocol.EntryFee);
-            if (!Array.TrueForAll(refund, reason => reason == RejectReason.None))
-                Debug.LogError("[LexioNetworkManager] 입장료 복구 실패: " + string.Join(",", userIds));
-            connected = seats.ConvertAll(IsConnected).ToArray();
+            // 차감 전에 저널에 남겨, 차감 커밋 직후 서버가 꺼져도 다음 시작 때 환불한다
+            settlement = new Settlement { matchId = matchId.ToString("D"), state = SettlementStarting, matchSize = matchSize, userIds = userIds };
+            settlements[settlement.matchId] = settlement;
+            if (SaveJournal()) (reasons, profiles) = await accounts.ChargeEntryFee(matchId, userIds);
+            else reasons = Array.ConvertAll(userIds, _ => RejectReason.ServiceUnavailable);
         }
         startingMatches--;
+        if (!NetworkServer.active) return; // 서버 정지: 디스크 저널의 Starting을 다음 시작 때 환불
+
+        bool charged = reasons == null || Array.TrueForAll(reasons, reason => reason == RejectReason.None);
+        if (charged && seats.TrueForAll(IsConnected))
+        {
+            if (settlement != null)
+            {
+                settlement.state = SettlementStarted;
+                settlement.images = Array.ConvertAll(profiles, profile => profile.profileImage); // 차감 커밋 시점 DB 색상
+            }
+            if ((settlement == null || SaveJournal()) && TryStartMatch(matchId, seats))
+            {
+                foreach (NetworkConnectionToClient seatConn in seats) starting.Remove(seatConn);
+                if (profiles != null)
+                    for (int i = 0; i < seats.Count; i++) accounts.SendProfile(seats[i], profiles[i]);
+                return;
+            }
+            if (settlement != null) settlement.state = SettlementStarting;
+        }
+
+        bool refunded = true;
+        if (settlement != null)
+        {
+            SettlementOutcome refund = await accounts.RefundEntryFee(matchId, userIds);
+            if (!NetworkServer.active) return;
+            refunded = refund == SettlementOutcome.Applied;
+            if (refunded) settlements.Remove(settlement.matchId);
+            else retries[settlement.matchId] = (Time.realtimeSinceStartup + RetryDelay(1), 1);
+            SaveJournal();
+        }
 
         var back = new List<NetworkConnectionToClient>();
         for (int i = 0; i < seats.Count; i++)
         {
             starting.Remove(seats[i]);
-            if (!connected[i]) continue;
-            if (reasons != null && reasons[i] != RejectReason.None) seats[i].Send(Result(0, reasons[i])); // requestId 0 = 서버 통보
+            if (!IsConnected(seats[i])) continue;
+            RejectReason reason = !refunded ? RejectReason.SettlementPending : reasons != null ? reasons[i] : RejectReason.None;
+            if (reason != RejectReason.None) seats[i].Send(Result(0, reason)); // requestId 0 = 서버 통보
             else { back.Add(seats[i]); queuedSize[seats[i]] = matchSize; }
         }
-        if (!NetworkServer.active) return;
         queues[matchSize].InsertRange(0, back);
         SendQueueUpdated(matchSize);
         TryStartMatches();
     }
 
-    // KPJ 테이블이 Finished가 되면 한 번 저장. AI로 바뀐 좌석(경기 중 이탈)은 제외하고, 유효 참가자 2명 이하는 Aborted로 보고 저장하지 않는다.
+    // 테이블·플레이어 생성 실패는 시작 전 실패로 보고 만든 것을 지운다(호출자가 환불).
+    bool TryStartMatch(Guid matchId, List<NetworkConnectionToClient> seats)
+    {
+        matches[matchId] = seats;
+        foreach (NetworkConnectionToClient seatConn in seats) connectionMatch[seatConn] = matchId;
+        try
+        {
+            StartMatch(matchId, seats);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+            foreach (NetworkConnectionToClient seatConn in seats)
+            {
+                connectionMatch.Remove(seatConn);
+                if (seatConn.identity != null) NetworkServer.RemovePlayerForConnection(seatConn, RemovePlayerOptions.Destroy);
+            }
+            matches.Remove(matchId);
+            if (matchTables.TryGetValue(matchId, out LexioTable table) && table != null) NetworkServer.Destroy(table.gameObject);
+            matchTables.Remove(matchId);
+            return false;
+        }
+    }
+
+    // KPJ 테이블이 Finished가 되면 한 번 결과를 확정해 저널에 남기고 저장 재시도 목록에 넣는다.
+    // 경기 중 이탈 좌석(KPJ isAi)은 칩 고정·순위/저장 제외. 유효 참가자 2명 이하는 Aborted(입장료 유지, 저장 없음).
     // 순위는 최종 칩 기준 경쟁 순위(같은 칩=같은 순위, 공동1등 모두 1등).
-    // shortcut: 중복 저장 방지는 matchAccounts 1회 제거(메모리) 기준, 실패 시 재시도 없이 Error 로그. 영속 완료 원장·재시작 복구는 DB-20261020-06 계약 후 추가.
-    // shortcut: 이탈자 칩 고정·KPJ Aborted 전환(QA-20261020-02)은 KPJ 담당, 여기서는 저장 제외만 한다.
     void TrySaveMatch(Guid matchId)
     {
-        if (!matchAccounts.TryGetValue(matchId, out (string[] userIds, int[] images) snapshot) || !matchTables.TryGetValue(matchId, out LexioTable table) ||
-            table == null || table.Phase != GamePhase.Finished || !(authenticator is NYMAccountAuthenticator accounts)) return;
-        matchAccounts.Remove(matchId);
-        string[] userIds = snapshot.userIds;
+        if (!settlements.TryGetValue(matchId.ToString("D"), out Settlement settlement) || settlement.state != SettlementStarted ||
+            !matchTables.TryGetValue(matchId, out LexioTable table) || table == null || table.Phase != GamePhase.Finished) return;
+        string[] userIds = settlement.userIds;
 
         IReadOnlyList<SeatInfo> seatInfos = table.Seats;
         var valid = new List<int>();
         for (int i = 0; i < userIds.Length && i < seatInfos.Count; i++)
             if (!seatInfos[i].isAi && userIds[i] != null) valid.Add(i);
-        if (valid.Count <= 2) return;
+        if (valid.Count <= 2)
+        {
+            settlements.Remove(settlement.matchId);
+            SaveJournal();
+            return;
+        }
 
         string[] ids = new string[valid.Count];
         int[] ranks = new int[valid.Count], finalChips = new int[valid.Count];
@@ -284,21 +355,135 @@ public class LexioNetworkManager : LexioTableNetworkManager
             finalChips[v] = chips;
             ranks[v] = 1 + valid.FindAll(other => seatInfos[other].chips > chips).Count;
         }
-        SaveMatch(userIds.Length, ids, ranks, finalChips, valid.ToArray(), snapshot.images, accounts);
+        settlement.state = SettlementFinished;
+        settlement.userIds = ids;
+        settlement.ranks = ranks;
+        settlement.finalChips = finalChips;
+        settlement.seatIndexes = valid.ToArray();
+        settlement.finishedAtUtcTicks = DateTime.UtcNow.Ticks; // 재시도도 같은 시각으로 저장
+        SaveJournal();
+        retries[settlement.matchId] = (0f, 0);
     }
 
-    async void SaveMatch(int matchSize, string[] ids, int[] ranks, int[] finalChips, int[] seatIndexes, int[] images, NYMAccountAuthenticator accounts)
+    bool HasPendingSettlement(string accountKey)
     {
-        foreach (string id in ids) saving.Add(id);
-        PlayerProfile[] profiles = await accounts.SaveMatch(matchSize, ids, ranks, finalChips, seatIndexes, images, DateTime.UtcNow);
-        foreach (string id in ids) saving.Remove(id);
-        if (profiles == null) { Debug.LogError("[LexioNetworkManager] 경기 결과 저장 실패: " + string.Join(",", ids)); return; }
-        if (!NetworkServer.active) return;
+        foreach (string key in retries.Keys)
+            if (Array.IndexOf(settlements[key].userIds, accountKey) >= 0) return true;
+        return false;
+    }
+
+    static float RetryDelay(int attempts) => Mathf.Min(60f, Mathf.Pow(2f, attempts));
+
+    void ProcessRetries()
+    {
+        if (retries.Count == 0 || !(authenticator is NYMAccountAuthenticator accounts)) return;
+        foreach (KeyValuePair<string, (float at, int attempts)> retry in new List<KeyValuePair<string, (float at, int attempts)>>(retries))
+            if (!settling.Contains(retry.Key) && Time.realtimeSinceStartup >= retry.Value.at) RunSettlement(retry.Key, accounts);
+    }
+
+    // 같은 matchId·같은 결과·같은 시각으로 다시 보낸다. DB 원장이 이미 반영된 정산은 AlreadyApplied로 끝난다(중복 잔액·통계·전적 없음).
+    async void RunSettlement(string key, NYMAccountAuthenticator accounts)
+    {
+        Settlement settlement = settlements[key];
+        settling.Add(key);
+        SettlementOutcome outcome;
+        PlayerProfile[] profiles = null;
+        if (settlement.state == SettlementFinished)
+            (outcome, profiles) = await accounts.SaveMatch(Guid.Parse(key), settlement.matchSize, settlement.userIds, settlement.ranks, settlement.finalChips,
+                settlement.seatIndexes, settlement.images, new DateTime(settlement.finishedAtUtcTicks, DateTimeKind.Utc));
+        else outcome = await accounts.RefundEntryFee(Guid.Parse(key), settlement.userIds);
+        settling.Remove(key);
+        if (!NetworkServer.active || !retries.TryGetValue(key, out (float at, int attempts) retry)) return; // 서버 정지: 디스크 저널에서 다음 시작 때 이어감
+
+        if (outcome == SettlementOutcome.Unavailable)
+        {
+            retries[key] = (Time.realtimeSinceStartup + RetryDelay(retry.attempts + 1), retry.attempts + 1);
+            if (retry.attempts % 10 == 0) Debug.LogWarning("[LexioNetworkManager] 정산 DB 오류, 재시도 대기: " + key);
+            return;
+        }
+        retries.Remove(key);
+        if (outcome == SettlementOutcome.Rejected)
+        {
+            settlement.state = SettlementFailed;
+            Debug.LogError("[LexioNetworkManager] 정산 거절(재시도 안 함, 저널 Failed 보관): " + key + " " + string.Join(",", settlement.userIds));
+        }
+        else settlements.Remove(key);
+        SaveJournal();
+
+        if (profiles == null) return;
         foreach (NetworkConnectionToClient conn in NetworkServer.connections.Values)
         {
-            int index = Array.IndexOf(ids, GetAccountKey(conn));
+            int index = Array.IndexOf(settlement.userIds, GetAccountKey(conn));
             if (index >= 0) accounts.SendProfile(conn, profiles[index]);
         }
+    }
+
+    string JournalPath => string.IsNullOrEmpty(settlementJournalPath) ? Path.Combine(Application.persistentDataPath, "settlement-journal.json") : settlementJournalPath;
+
+    // 서버 시작 때 미완 정산 복구: Starting=시작 못 함→환불 1회, Started=경기 중 중단→Aborted(입장료 유지), Finished=완료 저장 재시도, Failed=보관.
+    void LoadJournal()
+    {
+        settlements.Clear();
+        retries.Clear();
+        settling.Clear();
+        journalReadable = true;
+        if (!(authenticator is NYMAccountAuthenticator)) return;
+        try
+        {
+            if (File.Exists(JournalPath))
+                foreach (Settlement settlement in JsonUtility.FromJson<SettlementJournal>(File.ReadAllText(JournalPath)).entries)
+                {
+                    if (settlement.state == SettlementStarted) continue;
+                    settlements[settlement.matchId] = settlement;
+                    if (settlement.state != SettlementFailed) retries[settlement.matchId] = (0f, 0);
+                }
+        }
+        catch (Exception exception)
+        {
+            journalReadable = false;
+            Debug.LogError("[LexioNetworkManager] 정산 저널을 읽지 못해 경기 시작을 막습니다. 파일 확인 필요: " + JournalPath + " " + exception.Message);
+            return;
+        }
+        SaveJournal();
+    }
+
+    // 임시 파일에 쓴 뒤 교체(쓰기 도중 종료돼도 이전 저널 유지).
+    bool SaveJournal()
+    {
+        if (!journalReadable) return false;
+        try
+        {
+            var journal = new SettlementJournal();
+            journal.entries.AddRange(settlements.Values);
+            string path = JournalPath, temp = path + ".tmp";
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
+            File.WriteAllText(temp, JsonUtility.ToJson(journal));
+            if (File.Exists(path)) File.Replace(temp, path, null);
+            else File.Move(temp, path);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError("[LexioNetworkManager] 정산 저널 저장 실패: " + exception.Message);
+            return false;
+        }
+    }
+
+    // 경기 중 남은 사람이 2명 이하 → Aborted: 입장료 유지, 완료 정산·판수·전적 없음. 남은 사람은 접속을 유지한 채 메인으로 돌아가 다시 매칭한다.
+    void AbortMatch(Guid matchId)
+    {
+        if (settlements.Remove(matchId.ToString("D"))) SaveJournal();
+        List<NetworkConnectionToClient> seats = matches[matchId];
+        for (int i = 0; i < seats.Count; i++)
+        {
+            NetworkConnectionToClient seatConn = seats[i];
+            if (seatConn == null) continue;
+            seats[i] = null;
+            connectionMatch.Remove(seatConn);
+            seatConn.Send(Result(0, RejectReason.MatchEnded)); // requestId 0 = 서버 통보
+            NetworkServer.RemovePlayerForConnection(seatConn, RemovePlayerOptions.Destroy);
+        }
+        EndMatch(matchId);
     }
 
     static bool IsConnected(NetworkConnectionToClient conn) =>
@@ -358,8 +543,10 @@ public class LexioNetworkManager : LexioTableNetworkManager
     public override void LateUpdate()
     {
         base.LateUpdate();
-        if (NetworkServer.active && matchAccounts.Count > 0)
-            foreach (Guid matchId in new List<Guid>(matchAccounts.Keys)) TrySaveMatch(matchId);
+        if (!NetworkServer.active) return;
+        if (matchTables.Count > 0)
+            foreach (Guid matchId in new List<Guid>(matchTables.Keys)) TrySaveMatch(matchId);
+        ProcessRetries();
     }
 
     /// <summary>
@@ -490,8 +677,12 @@ public class LexioNetworkManager : LexioTableNetworkManager
 
         base.OnServerDisconnect(conn); // KPJ: 테이블 좌석을 AI로 전환 후 플레이어 파괴
 
-        if (isInMatch && matches[matchId].TrueForAll(seatConn => seatConn == null))
+        if (!isInMatch) return;
+        if (matches[matchId].TrueForAll(seatConn => seatConn == null))
             EndMatch(matchId);
+        else if (matchTables.TryGetValue(matchId, out LexioTable table) && table != null && table.Phase == GamePhase.Playing && !table.IsGameOver &&
+            matches[matchId].FindAll(seatConn => seatConn != null).Count <= 2)
+            AbortMatch(matchId);
     }
 
     /// <summary>
@@ -583,6 +774,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
 
         NetworkServer.RegisterHandler<QueueJoinRequest>(OnQueueJoinRequest);
         NetworkServer.RegisterHandler<QueueCancelRequest>(OnQueueCancelRequest);
+        LoadJournal();
     }
 
     /// <summary>
@@ -610,7 +802,9 @@ public class LexioNetworkManager : LexioTableNetworkManager
         matches.Clear();
         connectionMatch.Clear();
         matchTables.Clear();
-        matchAccounts.Clear();
+        // 디스크 저널은 그대로 둔다. 다음 시작 때 Started는 Aborted, 나머지는 이어서 처리
+        settlements.Clear();
+        retries.Clear();
         base.OnStopServer();
     }
 

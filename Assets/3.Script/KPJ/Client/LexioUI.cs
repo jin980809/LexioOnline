@@ -153,6 +153,8 @@ public class LexioUI : MonoBehaviour
     private int[] resultRanks = new int[0];
     private bool[] resultLeavers = new bool[0];
     private readonly List<int> settleCounts = new List<int>();
+    // 게임 도중 나간 자리(isAi)는 정산 제외·칩 고정
+    private readonly List<bool> settleLeavers = new List<bool>();
     private int[] settleChanges = new int[0];
     private bool isSettling;
     private Combination lastPlayCombination;
@@ -809,9 +811,11 @@ public class LexioUI : MonoBehaviour
     {
         isSettling = false;
         settleCounts.Clear();
+        settleLeavers.Clear();
         for (int i = 0; i < table.Seats.Count; i++)
         {
             settleCounts.Add(table.Seats[i].settleCount);
+            settleLeavers.Add(table.Seats[i].isAi);
             if (table.Seats[i].settleCount > 0)
             {
                 isSettling = true;
@@ -820,7 +824,7 @@ public class LexioUI : MonoBehaviour
 
         if (isSettling)
         {
-            settleChanges = ScoreCalculator.CalculateChipChanges(settleCounts);
+            settleChanges = ScoreCalculator.CalculateChipChanges(settleCounts, settleLeavers);
         }
     }
 

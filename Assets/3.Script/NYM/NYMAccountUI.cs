@@ -33,6 +33,7 @@ public class NYMAccountUI : MonoBehaviour
     bool returnToInfo;
     int historyTab, historyRequest, historyPage;
     GameRecordEntry[] history = new GameRecordEntry[0];
+    bool historyLoaded; // 현재 탭 조회 성공(빈 목록 포함). 로딩·실패·연결 종료 때 false
 
     T Get<T>(string path) where T : Component => uiRoot.Find(path).GetComponent<T>();
     Transform Panel(string name) => uiRoot.Find(name + "/Window");
@@ -299,7 +300,9 @@ public class NYMAccountUI : MonoBehaviour
     }
     void OnDisconnected()
     {
-        if (historyRequest != 0) { historyRequest = 0; ShowHistory("서버 연결이 종료되었습니다."); }
+        history = new GameRecordEntry[0]; historyLoaded = false; // 로그아웃·연결 종료 때 이전 계정 전적/요약을 남기지 않는다
+        if (historyRequest != 0) historyRequest = 0;
+        ShowHistory("서버 연결이 종료되었습니다.");
         if (pendingId == 0) return;
         pendingId = 0; Feedback(pendingFeedback, "서버 연결이 종료되었습니다.");
     }
@@ -317,7 +320,7 @@ public class NYMAccountUI : MonoBehaviour
             var button = Get<Button>("HistoryPopup/Window/Tabs/" + names[i]);
             if (button.spriteState.selectedSprite != null) button.image.sprite = i == index ? button.spriteState.selectedSprite : button.spriteState.disabledSprite;
         }
-        historyTab = index; historyPage = 0; history = new GameRecordEntry[0];
+        historyTab = index; historyPage = 0; history = new GameRecordEntry[0]; historyLoaded = false;
         if (historyRequest != 0) { ShowHistory("불러오는 중..."); return; } // 응답 후 OnRecords가 현재 탭으로 다시 요청
         historyRequest = LoggedIn ? account.RequestRecords(HistoryMatchSize) : 0;
         ShowHistory(historyRequest != 0 ? "불러오는 중..." : "로그인 후 전적을 볼 수 있습니다.");
@@ -330,6 +333,7 @@ public class NYMAccountUI : MonoBehaviour
         if (result.matchSize != HistoryMatchSize) { HistoryTab(historyTab); return; }
         if (result.code != AccountResultCode.Success) { ShowHistory("전적을 불러오지 못했습니다."); return; }
         history = result.records ?? new GameRecordEntry[0];
+        historyLoaded = true;
         ShowHistory(history.Length == 0 ? (historyTab == 0 ? "" : HistoryMatchSize + "인 ") + "저장된 전적이 없습니다." : null);
     }
     // message가 있으면 목록 대신 안내만 표시. 행 템플릿 List/Row0..N을 페이지 단위로 채운다.
@@ -356,7 +360,7 @@ public class NYMAccountUI : MonoBehaviour
             ShowRankImages(row, record.rank);
             ShowParticipants(row.Find("Players"), record.participantProfileImages);
             row.Find("RoundBadge/RoundText").GetComponent<Text>().text = LexioProtocol.RoundCount + "라운드";
-            ShowChipChange(row.Find("ChipDeltaText").GetComponent<Text>(), record.finalCoin);
+            ShowChipChange(row.Find("ChipDeltaText").GetComponent<Text>(), record);
         }
         ShowHistorySummary(window.Find("SummaryText"), message);
         window.Find("Pager/PageText").GetComponent<Text>().text = (historyPage + 1) + " <color=#ADA5C4>/ " + pages + "</color>";
@@ -364,11 +368,16 @@ public class NYMAccountUI : MonoBehaviour
         window.Find("Pager/NextButton").GetComponent<Button>().interactable = message == null && historyPage < pages - 1;
     }
     // finalCoin=그 판 남은 칩. 시작 칩(50)과의 차이를 +는 초록, -는 빨강으로 표시 (2026-10-21 사용자 결정)
-    void ShowChipChange(Text text, int finalCoin)
+    // 칩 형식 미확인 기록(과거 잔액형 등)은 추정하지 않고 중립색 —
+    void ShowChipChange(Text text, GameRecordEntry record)
     {
-        int change = finalCoin - GameRules.StartingChips;
-        text.text = change.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture);
-        if (change > 0)
+        long change = (long)record.finalCoin - GameRules.StartingChips;
+        text.text = record.chipsKnown ? change.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture) : "—";
+        if (!record.chipsKnown)
+        {
+            text.color = new Color32(0x23, 0x15, 0x36, 0xFF);
+        }
+        else if (change > 0)
         {
             text.color = new Color32(0x2E, 0x9C, 0x45, 0xFF);
         }
@@ -400,23 +409,38 @@ public class NYMAccountUI : MonoBehaviour
         }
     }
 
-    // 오른쪽 위 요약: 받은 전적(서버가 최근 10판까지 보냄) 기준 판 수와 1위 횟수. 안내 문구를 띄울 때는 비움.
+    // 오른쪽 위 요약: 받은 전적 전체(서버가 선택 탭 최근 20판까지 보냄, 페이지와 무관) 기준 판 수·1위 횟수·칩 증감 합계.
+    // 빈 목록 성공은 0판/0회/0. 칩 형식 미확인 기록이 하나라도 있으면 합계는 — 와 안내. 로딩·실패·연결 종료 때는 비움.
     void ShowHistorySummary(Transform summary, string message)
     {
         if (summary != null)
         {
             string text = "";
-            if (message == null)
+            if (historyLoaded)
             {
                 int wins = 0;
+                long sum = 0;
+                bool known = true;
                 for (int i = 0; i < history.Length; i++)
                 {
                     if (history[i].rank == 1)
                     {
                         wins++;
                     }
+                    known &= history[i].chipsKnown;
+                    sum += (long)history[i].finalCoin - GameRules.StartingChips;
                 }
-                text = "최근 <color=#231536>" + history.Length + "판</color>   1위 <color=#231536>" + wins + "회</color>";
+                string chips = "<color=#231536>—</color>";
+                if (known)
+                {
+                    string color = sum > 0 ? "#2E9C45" : sum < 0 ? "#E3503B" : "#231536";
+                    chips = "<color=" + color + ">" + sum.ToString("+0;-0;0", System.Globalization.CultureInfo.InvariantCulture) + "</color>";
+                }
+                text = "최근 <color=#231536>" + history.Length + "판</color>   1위 <color=#231536>" + wins + "회</color>   칩 " + chips;
+                if (!known)
+                {
+                    text += " (칩 미기록 포함)"; // 요약 칸은 한 줄
+                }
             }
             summary.GetComponent<Text>().text = text;
         }

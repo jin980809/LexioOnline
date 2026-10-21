@@ -17,13 +17,18 @@ public static class ScoreCalculator
     }
 
     // 모든 쌍에 대해 유효 장수가 많은 쪽이 차이만큼 적은 쪽에게 지급
-    public static int[] CalculateChipChanges(IReadOnlyList<int> effectiveCounts)
+    // isLeaver가 true인 자리(게임 도중 나간 자리)는 정산에서 빠지고 칩이 고정됨 (COMPLETE-LEAVE-ABORT, 사용자 결정)
+    public static int[] CalculateChipChanges(IReadOnlyList<int> effectiveCounts, IReadOnlyList<bool> isLeaver = null)
     {
         int[] changes = new int[effectiveCounts.Count];
         for (int i = 0; i < effectiveCounts.Count; i++)
         {
             for (int j = i + 1; j < effectiveCounts.Count; j++)
             {
+                if (isLeaver != null && (isLeaver[i] || isLeaver[j]))
+                {
+                    continue;
+                }
                 int difference = effectiveCounts[j] - effectiveCounts[i];
                 changes[i] += difference;
                 changes[j] -= difference;

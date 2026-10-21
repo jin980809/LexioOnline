@@ -7,6 +7,8 @@ public sealed class LexioGame
     private readonly Random random;
     private readonly List<List<Tile>> hands = new List<List<Tile>>();
     private readonly int[] chips;
+    // 게임 도중 나간 자리. 칩 고정·정산 제외, 빈 바닥에서도 패스 가능
+    private readonly bool[] isLeaver;
 
     public int PlayerCount { get; }
     public int MaxNumber { get; }
@@ -35,6 +37,7 @@ public sealed class LexioGame
         MaxNumber = GameRules.GetMaxNumber(playerCount);
         this.random = random;
         chips = new int[playerCount];
+        isLeaver = new bool[playerCount];
         for (int i = 0; i < playerCount; i++)
         {
             chips[i] = startingChips;
@@ -50,6 +53,16 @@ public sealed class LexioGame
     public int GetChips(int seat)
     {
         return chips[seat];
+    }
+
+    public void SetLeaver(int seat)
+    {
+        isLeaver[seat] = true;
+    }
+
+    public bool IsLeaver(int seat)
+    {
+        return isLeaver[seat];
     }
 
     public void StartRound()
@@ -138,7 +151,8 @@ public sealed class LexioGame
     public bool TryPass(int seat)
     {
         bool isPassed = false;
-        if (IsRoundOver == false && seat == CurrentSeat && IsLeadTurn == false)
+        // 나간 자리는 빈 바닥(리드)에서도 패스해서 다음 자리가 리드함 (멈춤 방지)
+        if (IsRoundOver == false && seat == CurrentSeat && (IsLeadTurn == false || isLeaver[seat]))
         {
             WasTrickCleared = false;
             AdvanceTurn();
@@ -199,7 +213,7 @@ public sealed class LexioGame
         }
 
         LastEffectiveCounts = effectiveCounts;
-        LastChipChanges = ScoreCalculator.CalculateChipChanges(effectiveCounts);
+        LastChipChanges = ScoreCalculator.CalculateChipChanges(effectiveCounts, isLeaver);
         for (int seat = 0; seat < PlayerCount; seat++)
         {
             chips[seat] += LastChipChanges[seat];

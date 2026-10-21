@@ -100,6 +100,12 @@ public class LexioTable : NetworkBehaviour
         get { return lastPlaySeat; }
     }
 
+    // 서버: 마지막 라운드 정산 대기 중이거나 끝남 (이후 나간 사람은 이탈자가 아님)
+    public bool IsGameOver
+    {
+        get { return phase == GamePhase.Finished || (game != null && game.IsFinished); }
+    }
+
     public IReadOnlyList<SeatInfo> Seats
     {
         get { return seats; }
@@ -215,6 +221,10 @@ public class LexioTable : NetworkBehaviour
                     SeatInfo info = seats[seat];
                     info.isAi = true;
                     seats[seat] = info;
+                    if (game != null)
+                    {
+                        game.SetLeaver(seat);
+                    }
                 }
                 turnStartTime = NetworkTime.time;
 
@@ -410,12 +420,26 @@ public class LexioTable : NetworkBehaviour
         }
     }
 
-    // 시간 초과 / AI: 리드 차례면 가장 약한 싱글(라운드 첫 선이면 구름3), 아니면 패스
+    // 시간 초과: 리드 차례면 가장 약한 싱글(라운드 첫 선이면 구름3), 아니면 패스
+    // 나간 자리: 빈 바닥 리드에서 구름3을 들고 있으면 구름3만, 그 외(빈 바닥 포함)는 패스 (사용자 결정)
     [Server]
     private void DoAutoAction()
     {
         int seat = game.CurrentSeat;
-        if (game.IsLeadTurn)
+        if (game.IsLeaver(seat))
+        {
+            List<Tile> cloudThree = new List<Tile>();
+            cloudThree.Add(new Tile(TileSuit.Cloud, 3));
+            if (game.IsLeadTurn && game.TryPlay(seat, cloudThree))
+            {
+                AfterPlay(seat, cloudThree);
+            }
+            else if (game.TryPass(seat))
+            {
+                AfterPass(seat);
+            }
+        }
+        else if (game.IsLeadTurn)
         {
             List<Tile> tiles = new List<Tile>();
             tiles.Add(game.GetWeakestTile(seat));
