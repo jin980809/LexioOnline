@@ -13,21 +13,21 @@ MonoBehaviour:
   m_Name: TileDatabase
   m_EditorClassIdentifier: Assembly-CSharp::TileDatabase
   cloudPrefabs:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: 7430326025601655677, guid: 9ccedc7e0a41ea044ac6e672d8a4bfe5, type: 3}
+  - {fileID: 8568048012121671645, guid: d5f4c82ae1a72ed4780fe231bb5746d6, type: 3}
+  - {fileID: 7820589766892053894, guid: ecc10a4e39c7b6e4c87c2ffdfd7d174b, type: 3}
+  - {fileID: 3821375066765465736, guid: 57996d7105168a441bdd096f56e1f570, type: 3}
+  - {fileID: 2982044742146022367, guid: 032d0fd8171fe0d479acb26620471af2, type: 3}
+  - {fileID: 6371028932154080590, guid: c4eb283dbc6b4aa4993ba1c39d3aa3c4, type: 3}
+  - {fileID: 7370605200591839970, guid: 1943caa3cd81e1c46adc9f5e375ee045, type: 3}
+  - {fileID: 716606939095918717, guid: 344a0540153ac8349a3621dedf3176f4, type: 3}
+  - {fileID: 8462896245922310192, guid: 9f791fdd84eaa6e4ba9fa93ba5a535f4, type: 3}
+  - {fileID: 10659992136488069, guid: 50814e2a60818ee44bd3ca19cbedf69b, type: 3}
+  - {fileID: 7639237234536059179, guid: ba4f26fb4c2ba5842b64bd626a0f0ad9, type: 3}
+  - {fileID: 9131605515209404983, guid: aa9f4b98e0ba4494c959b280723b4ec8, type: 3}
+  - {fileID: 6537352590377068077, guid: 06ad79a395eacae4ebcbbce2eda713f7, type: 3}
+  - {fileID: 4754959996066532538, guid: 8adedef7525904444b957bc1ee466166, type: 3}
+  - {fileID: 5475542907530126426, guid: 1eeeeae94d76e3c44a61807578d57b98, type: 3}
   starPrefabs:
   - {fileID: 6510165111226306119, guid: c8d010665f1c4894083b5e1c5cece635, type: 3}
   - {fileID: 3562865947497260774, guid: b633eba8007bbc742bcfb2e795184783, type: 3}

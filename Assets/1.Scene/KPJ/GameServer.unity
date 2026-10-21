@@ -387,7 +387,7 @@ MonoBehaviour:
   evaluationMethod: 0
   evaluationInterval: 3
   timeInterpolationGui: 0
-  startAsServer: 0
+  startAsServer: 1
   tablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   maxMatches: 20
   matchTablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}

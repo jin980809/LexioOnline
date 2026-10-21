@@ -4,6 +4,7 @@ using UnityEngine;
 
 // Lexio/Setup UI Sprite Atlas: LexioUI 이미지 폴더마다 Sprite Atlas(V2)를 만들어 드로우콜과 메모리를 줄임
 // 같은 아틀라스에 든 이미지끼리는 한 번에 그려지고, 크기가 4의 배수가 아닌 이미지도 아틀라스 단위로 압축됨
+// 아틀라스에 들어가는 원본 이미지는 압축하지 않음 (압축은 아틀라스에서 한 번만 하도록. 빌드에는 아틀라스만 들어감)
 // 다시 실행하면 이미 있는 아틀라스는 새로 만들지 않고 설정만 다시 맞춤
 // 한 장짜리 큰 이미지 폴더(background, logo)는 아틀라스에 넣지 않음
 public class LexioSpriteAtlasSetup
@@ -35,8 +36,10 @@ public class LexioSpriteAtlasSetup
         EnsureAtlasFolder();
 
         int atlasCount = 0;
+        int uncompressedCount = 0;
         for (int i = 0; i < packFolders.Length; i++)
         {
+            uncompressedCount += UncompressSources(UiSpriteFolder + "/" + packFolders[i]);
             if (SetupAtlas(packFolders[i]))
             {
                 atlasCount++;
@@ -45,7 +48,7 @@ public class LexioSpriteAtlasSetup
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[LexioSpriteAtlasSetup] 아틀라스 " + atlasCount + "개 설정 완료 (" + AtlasFolder + ")");
+        Debug.Log("[LexioSpriteAtlasSetup] 아틀라스 " + atlasCount + "개 설정 완료 (" + AtlasFolder + "), 원본 이미지 무압축으로 바꿈 " + uncompressedCount + "개");
     }
 
     private void EnsureAtlasFolder()
@@ -54,6 +57,30 @@ public class LexioSpriteAtlasSetup
         {
             AssetDatabase.CreateFolder(UiSpriteFolder, AtlasFolderName);
         }
+    }
+
+    // 아틀라스에 들어갈 원본 이미지의 압축을 끔. 압축된 원본을 모아 아틀라스에서 다시 압축하면 화질이 두 번 떨어지기 때문
+    // (Unity 경고: "Source Texture ... is using compressed format")
+    // 기본 플랫폼 설정만 바꾸고, 9-slice 테두리 등 다른 임포트 설정은 그대로 둠. 바꾼 이미지 수를 돌려줌
+    private int UncompressSources(string folderPath)
+    {
+        int changed = 0;
+        if (AssetDatabase.IsValidFolder(folderPath))
+        {
+            string[] guids = AssetDatabase.FindAssets("t:Texture2D", new string[] { folderPath });
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                TextureImporter textureImporter = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (textureImporter != null && textureImporter.textureCompression != TextureImporterCompression.Uncompressed)
+                {
+                    textureImporter.textureCompression = TextureImporterCompression.Uncompressed;
+                    textureImporter.SaveAndReimport();
+                    changed++;
+                }
+            }
+        }
+        return changed;
     }
 
     // 폴더 하나로 아틀라스를 만들거나(없을 때) 설정을 다시 맞춤. 성공하면 true

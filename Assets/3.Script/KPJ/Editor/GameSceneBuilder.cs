@@ -34,7 +34,7 @@ public class GameSceneBuilder
     // NYM 씬에만 있는 UI (UICanvas 기준 경로). 같은 부모 아래로 옮겨 옴
     private readonly string[] nymOnlyPaths =
     {
-        "ProfileEditPopup", "PopupLogo", "MainPage/ProfileCard/GuestNicknameInput",
+        "ProfileEditPopup", "MainPage/ProfileCard/GuestNicknameInput",
         "PasswordChangePopup/Window/Feedback", "AccountDeletePopup/Window/Feedback", "HistoryPopup/Window/EmptyText"
     };
     // 열고 닫는 모션(PopupView + 창의 PopOutAnimator)을 붙일 팝업
@@ -144,6 +144,7 @@ public class GameSceneBuilder
         MoveToTarget(accountSystem, null);
         accountSystem.name = "AccountSystem";
         NYMAccountUI accountUi = accountSystem.AddComponent<NYMAccountUI>();
+        ClearPopupBackdrop(accountSystem.GetComponent<NYMMatchmakingUI>());
 
         // 로그인~메인 화면 (3D 배경 포함)은 Frontend 아래로 모아 게임 중에 통째로 끔
         GameObject frontend = new GameObject("Frontend");
@@ -159,9 +160,6 @@ public class GameSceneBuilder
         }
         frontend.transform.position = frontendOffset;
         uiCanvas = frontend.transform.Find("UICanvas");
-        // NYM 매칭 UI가 팝업이 열려 있는 동안 로그인·메인 화면을 흐리게 할 때 씀
-        AddCanvasGroup(uiCanvas.Find("LoginPage"));
-        AddCanvasGroup(uiCanvas.Find("MainPage"));
         SetupFrontendCamera(frontCamera, gameCamera);
         SceneManager.MoveGameObjectToScene(FindRoot(frontScene, "SoundManager"), targetScene);
         SceneManager.MoveGameObjectToScene(FindRoot(frontScene, "ScreenSettings"), targetScene);
@@ -192,7 +190,8 @@ public class GameSceneBuilder
         SetupLexioUi(lexioCanvas, frontend);
         SetupAccountUi(accountUi, accountSystem.GetComponent<NYMMatchmakingUI>());
         SetupPopups();
-        WireButtons(lexioCanvas, guidePopup);
+        PopupView guideView = SetupGuidePopup(guidePopup);
+        WireButtons(lexioCanvas, guideView);
         SetInitialStates(guidePopup);
 
         Object.DestroyImmediate(oldManager);
@@ -219,12 +218,16 @@ public class GameSceneBuilder
         camera.depth = gameCamera.GetComponent<Camera>().depth + 1f;
     }
 
-    private void AddCanvasGroup(Transform target)
+    // 팝업이 열려 있어도 로그인·메인 화면은 그대로 보여 줌 (뒤는 팝업의 어두운 배경만 덮음)
+    // NYM 매칭 UI는 이 칸들이 비어 있으면 화면을 투명하게 하거나 로고를 띄우지 않음
+    // NYM 씬을 가리키는 참조라서, 다른 씬 참조를 이 씬으로 다시 잇기 전에 비움
+    private void ClearPopupBackdrop(NYMMatchmakingUI matchmakingUi)
     {
-        if (target.GetComponent<CanvasGroup>() == null)
-        {
-            target.gameObject.AddComponent<CanvasGroup>();
-        }
+        SerializedObject serializedObject = new SerializedObject(matchmakingUi);
+        serializedObject.FindProperty("menuGroup").objectReferenceValue = null;
+        serializedObject.FindProperty("loginGroup").objectReferenceValue = null;
+        serializedObject.FindProperty("popupLogo").objectReferenceValue = null;
+        serializedObject.ApplyModifiedPropertiesWithoutUndo();
     }
 
     private Transform CreateSharedCanvas(GameObject lexioCanvas)
@@ -513,8 +516,101 @@ public class GameSceneBuilder
         }
     }
 
+    // LSY 가이드 팝업은 루트에 PopOutAnimator가 있어 어두운 배경(Dim)까지 같이 줄었다 커짐
+    // 다른 팝업처럼 Dim은 루트에 두고 나머지를 Window로 묶어 창만 튀어나오게 함 (LSY 원본 씬은 그대로)
+    private PopupView SetupGuidePopup(GameObject guidePopup)
+    {
+        RectTransform root = (RectTransform)guidePopup.transform;
+        Object setting = AssetDatabase.LoadAssetAtPath<PopupSettings>(PopupSettingsPath);
+        PopOutAnimator oldAnimator = guidePopup.GetComponent<PopOutAnimator>();
+        if (oldAnimator != null)
+        {
+            setting = new SerializedObject(oldAnimator).FindProperty("setting").objectReferenceValue;
+            RemoveListenersTo(root, oldAnimator);
+            Object.DestroyImmediate(oldAnimator);
+        }
+        // 예전 애니메이션이 쓰던 루트의 CanvasGroup은 항상 보이고 눌리게 둠
+        CanvasGroup rootGroup = guidePopup.GetComponent<CanvasGroup>();
+        if (rootGroup != null)
+        {
+            rootGroup.alpha = 1f;
+            rootGroup.interactable = true;
+            rootGroup.blocksRaycasts = true;
+        }
+
+        GameObject windowObject = new GameObject("Window", typeof(RectTransform), typeof(CanvasGroup));
+        windowObject.layer = guidePopup.layer;
+        RectTransform window = (RectTransform)windowObject.transform;
+        window.SetParent(root, false);
+        // 크기와 위치는 루트와 같게 해서 옮겨 올 자식의 배치 값이 그대로 유지되게 함
+        // 피벗만 화면 가운데에 두어 창이 화면 가운데를 기준으로 커지고 줄게 함 (피벗은 0~1 밖이어도 됨)
+        window.anchorMin = Vector2.zero;
+        window.anchorMax = Vector2.one;
+        window.pivot = GetCanvasCenterPivot(root);
+        window.anchoredPosition = Vector2.zero;
+        window.sizeDelta = Vector2.zero;
+
+        // Dim을 뺀 나머지를 그리는 순서대로 창 아래로 옮기고, 창은 Dim 위에 그려지게 맨 뒤에 둠
+        List<Transform> contents = new List<Transform>();
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (child != window && child.name != "Dim")
+            {
+                contents.Add(child);
+            }
+        }
+        for (int i = 0; i < contents.Count; i++)
+        {
+            contents[i].SetParent(window, true);
+        }
+        window.SetAsLastSibling();
+
+        PopOutAnimator animator = windowObject.AddComponent<PopOutAnimator>();
+        SerializedObject animatorObject = new SerializedObject(animator);
+        animatorObject.FindProperty("setting").objectReferenceValue = setting;
+        animatorObject.ApplyModifiedPropertiesWithoutUndo();
+
+        PopupView view = guidePopup.AddComponent<PopupView>();
+        SerializedObject viewObject = new SerializedObject(view);
+        viewObject.FindProperty("window").objectReferenceValue = animator;
+        viewObject.FindProperty("closeButton").objectReferenceValue = FindButton(window, "CloseButton");
+        viewObject.ApplyModifiedPropertiesWithoutUndo();
+        return view;
+    }
+
+    // root 안에서 화면(UICanvas) 한가운데가 피벗 비율로 어디인지. root는 UICanvas의 바로 아래에 있어야 함
+    private Vector2 GetCanvasCenterPivot(RectTransform root)
+    {
+        RectTransform canvasRect = (RectTransform)uiCanvas;
+        Vector2 center = canvasRect.rect.center - (Vector2)root.localPosition;
+        Rect rect = root.rect;
+        Vector2 result = new Vector2(0.5f, 0.5f);
+        if (rect.width > 0f && rect.height > 0f)
+        {
+            result = new Vector2((center.x - rect.xMin) / rect.width, (center.y - rect.yMin) / rect.height);
+        }
+        return result;
+    }
+
+    // root 아래 버튼들의 OnClick 중 target을 부르는 연결을 지움
+    private void RemoveListenersTo(Transform root, Object target)
+    {
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        for (int b = 0; b < buttons.Length; b++)
+        {
+            for (int i = buttons[b].onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+            {
+                if (buttons[b].onClick.GetPersistentTarget(i) == target)
+                {
+                    UnityEventTools.RemovePersistentListener(buttons[b].onClick, i);
+                }
+            }
+        }
+    }
+
     // 팝업을 여는 버튼 (NYM 코드가 입력칸 준비 등을 따로 붙이는 버튼도 여기서 연다)
-    private void WireButtons(GameObject lexioCanvas, GameObject guidePopup)
+    private void WireButtons(GameObject lexioCanvas, PopupView guideView)
     {
         WireOpen(uiCanvas, "LoginPage/LoginPanel/SignUpLink", "SignUpPopup");
         WireOpen(uiCanvas, "LoginPage/LoginPanel/PasswordChangeLink", "PasswordChangePopup");
@@ -527,7 +623,7 @@ public class GameSceneBuilder
         Button guideButton = FindButton(uiCanvas, "MainPage/Menu/GuideButton");
         if (guideButton != null)
         {
-            UnityEventTools.AddPersistentListener(guideButton.onClick, guidePopup.GetComponent<PopOutAnimator>().Open);
+            UnityEventTools.AddPersistentListener(guideButton.onClick, guideView.Open);
         }
 
         // 게임 화면의 설정 버튼
@@ -615,10 +711,13 @@ public class GameSceneBuilder
 
         if (serverManager != null)
         {
-            // 헤드리스 실행 파일은 켜자마자 서버 시작, 에디터에서도 Play 하면 서버 시작
+            // 헤드리스 실행 파일은 켜자마자 서버 시작 (Mirror의 헤드리스 자동 시작)
+            // 일반 에디터 Play는 헤드리스가 아니라서 위 자동 시작이 동작하지 않으므로 startAsServer로 시작함
+            // (헤드리스에서는 Mirror가 먼저 서버를 켜고, KPJ 매니저는 이미 켜져 있으면 건너뜀)
             SerializedObject serializedObject = new SerializedObject(serverManager);
             serializedObject.FindProperty("headlessStartMode").enumValueIndex = AutoStartServer;
             serializedObject.FindProperty("editorAutoStart").boolValue = true;
+            serializedObject.FindProperty("startAsServer").boolValue = true;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
         else

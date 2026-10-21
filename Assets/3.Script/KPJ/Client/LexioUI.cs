@@ -185,6 +185,10 @@ public class LexioUI : MonoBehaviour
     private readonly Vector3[] avoidCorners = new Vector3[4];
     private float noticeHideTime;
 
+    // 효과음용: 내 차례 남은 시간 경고가 켜질 때 / 알림 문구(낼 수 없는 패, 서버 알림)를 띄울 때
+    public event System.Action TimerWarningStarted;
+    public event System.Action NoticeShown;
+
     private void OnEnable()
     {
         networkManager.NoticeReceived += OnNoticeReceived;
@@ -649,6 +653,10 @@ public class LexioUI : MonoBehaviour
             if (isWarning == false && timerRoot != null)
             {
                 timerRoot.localRotation = timerDefaultRotation;
+            }
+            if (isWarning && TimerWarningStarted != null)
+            {
+                TimerWarningStarted();
             }
         }
 
@@ -1272,6 +1280,10 @@ public class LexioUI : MonoBehaviour
     {
         noticeText.text = message;
         noticeHideTime = Time.time + noticeSeconds;
+        if (NoticeShown != null)
+        {
+            NoticeShown();
+        }
     }
 
     private string GetSecondText(int seconds)

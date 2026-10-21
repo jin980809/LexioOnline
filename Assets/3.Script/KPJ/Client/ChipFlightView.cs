@@ -67,6 +67,9 @@ public class ChipFlightView : MonoBehaviour
     // 보이는 칩 수가 바뀔 때마다 증가 (UI가 이 값이 바뀌면 칩 숫자를 다시 그림)
     public int ChipVersion { get; private set; }
 
+    // 효과음용: 정산 칩이 날아가기 시작할 때 (날아갈 칩이 있을 때만)
+    public event System.Action SettleStarted;
+
     private void Awake()
     {
         if (chipPrefab == null)
@@ -183,6 +186,10 @@ public class ChipFlightView : MonoBehaviour
 
         ScheduleFlights();
         settleStartTime = Time.time;
+        if (chipFlights.Count > 0 && SettleStarted != null)
+        {
+            SettleStarted();
+        }
     }
 
     // 실제 규칙: 모든 두 사람끼리 정산 기준 장수가 많은 쪽이 차이만큼 적은 쪽에게 줌
