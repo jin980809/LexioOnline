@@ -193,19 +193,21 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
 
     // [서버] 정상 완료 경기 저장(DB-20261020-04). 유효 참가자 전원의 userinfo 통계/토큰 UPDATE + 모드 전적 INSERT를 한 트랜잭션으로.
     // currentCoin은 잠근 DB 값에 칩 증감만 더한다(입장료 재차감 없음). 실패하면 전부 롤백하고 null.
-    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, DateTime finishedAtUtc)
+    // seatIndexes[i]=userIds[i]의 시작 좌석, participantImages=시작 좌석 순 원래 참가자 전원(이탈자 포함) 색상. 잘못된 스냅샷은 색상 열 0(미기록)으로 저장.
+    public async Task<PlayerProfile[]> SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc)
     {
         try
         {
             string connectionString = ConnectionString();
-            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, chipDeltas, finishedAtUtc, connectionString));
+            return await Task.Run(() => SaveMatch(matchSize, userIds, ranks, chipDeltas, seatIndexes, participantImages, finishedAtUtc, connectionString));
         }
         catch (Exception) { return null; }
     }
 
-    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, DateTime finishedAtUtc, string connectionString)
+    static PlayerProfile[] SaveMatch(int matchSize, string[] userIds, int[] ranks, int[] chipDeltas, int[] seatIndexes, int[] participantImages, DateTime finishedAtUtc, string connectionString)
     {
         if (!LexioProtocol.IsValidMatchSize(matchSize)) return null;
+        bool snapshot = participantImages != null && participantImages.Length == matchSize && Array.TrueForAll(participantImages, image => image >= 0 && image <= 5);
         string mode = matchSize == 3 ? "three" : matchSize == 4 ? "four" : "five";
         try
         {
@@ -251,7 +253,16 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                         command.CommandText = "UPDATE userinfo SET first=@first,playNum=@play,winRate=@rate," + mode + "PlayersPlayNum=@modePlay," + mode +
                             "PlayersFirst=@modeFirst,currentCoin=@coin,maxCoin=@max WHERE userID=@id";
                         if (command.ExecuteNonQuery() != 1) return null;
-                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin) VALUES(@id,@rank,@time,@coin)";
+                        // 색상 열은 색상+1 저장(0=미기록·기존 행 기본값). myProfile=본인, anotherProfile*=나머지 좌석 순, 빈 칸 0.
+                        var stored = new int[ProfileImageColumns.Length];
+                        if (snapshot)
+                        {
+                            stored[0] = participantImages[seatIndexes[i]] + 1;
+                            for (int seat = 0, other = 1; seat < matchSize; seat++) if (seat != seatIndexes[i]) stored[other++] = participantImages[seat] + 1;
+                        }
+                        for (int c = 0; c < stored.Length; c++) command.Parameters.AddWithValue("@p" + c, stored[c]);
+                        command.CommandText = "INSERT INTO " + RecordTable(matchSize) + "(userID,`rank`,`time`,finalCoin," + string.Join(",", ProfileImageColumns) +
+                            ") VALUES(@id,@rank,@time,@coin,@p0,@p1,@p2,@p3,@p4)";
                         if (command.ExecuteNonQuery() != 1) return null;
                         profiles[i] = p;
                     }
@@ -271,6 +282,21 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
     }
 
     static string RecordTable(int matchSize) => matchSize == 3 ? "threepersons" : matchSize == 4 ? "fourpersons" : "fivepeople";
+    static readonly string[] ProfileImageColumns = { "myProfile", "anotherProfileOne", "anotherProfileTwo", "anotherProfileThree", "anotherProfileFour" };
+
+    // 색상+1 저장값(reader[start..start+4]) → 색상 0~5 배열. 본인 0(미기록·과거 기록)이거나 참가자 수/범위가 틀리면 null(임의 색으로 대체하지 않음).
+    static int[] ReadProfileImages(MySqlDataReader reader, int start, int matchSize)
+    {
+        var images = new int[matchSize];
+        for (int c = 0; c < ProfileImageColumns.Length; c++)
+        {
+            int value = Convert.ToInt32(reader[start + c]);
+            if (c >= matchSize) { if (value != 0) return null; continue; }
+            if (value < 1 || value > 6) return null;
+            images[c] = value - 1;
+        }
+        return images;
+    }
 
     // shortcut: 같은 time 행 순서는 미정, 고유키(DB-20261020-06) 계약 후 2차 정렬 추가.
     static RecordQueryResult QueryRecords(RecordQueryRequest request, string userId, string connectionString)
@@ -282,7 +308,8 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
         {
             if (request.matchSize != 0 && request.matchSize != size) continue;
             if (sql.Length > 0) sql.Append(" UNION ALL ");
-            sql.Append("SELECT ").Append(size).Append(",`rank`,`time`,finalCoin FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
+            sql.Append("SELECT ").Append(size).Append(",`rank`,`time`,finalCoin,").Append(string.Join(",", ProfileImageColumns))
+                .Append(" FROM ").Append(RecordTable(size)).Append(" WHERE userID=@id");
         }
         sql.Append(" ORDER BY `time` DESC LIMIT 10");
         var records = new List<GameRecordEntry>();
@@ -299,7 +326,8 @@ public class NYMAccountAuthenticator : NetworkAuthenticator
                 records.Add(new GameRecordEntry
                 {
                     matchSize = Convert.ToInt32(reader[0]), rank = Convert.ToInt32(reader[1]),
-                    playedAtUtcTicks = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc).Ticks, finalCoin = Convert.ToInt32(reader[3])
+                    playedAtUtcTicks = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc).Ticks, finalCoin = Convert.ToInt32(reader[3]),
+                    participantProfileImages = ReadProfileImages(reader, 4, Convert.ToInt32(reader[0]))
                 });
             }
         }

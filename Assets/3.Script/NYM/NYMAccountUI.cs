@@ -346,13 +346,27 @@ public class NYMAccountUI : MonoBehaviour
             // KST는 서머타임이 없어 UTC+9 고정
             row.Find("DateText").GetComponent<Text>().text = new DateTime(record.playedAtUtcTicks, DateTimeKind.Utc).AddHours(9).ToString("MM.dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
             row.Find("Crown").gameObject.SetActive(record.rank == 1);
-            row.Find("Players").gameObject.SetActive(false); // 전적 행에 참가자 정보 없음
+            ShowParticipants(row.Find("Players"), record.participantProfileImages);
             row.Find("RoundBadge/RoundText").GetComponent<Text>().text = LexioProtocol.RoundCount + "라운드";
             row.Find("ChipDeltaText").GetComponent<Text>().text = record.finalCoin.ToString(); // 증감이 아니라 정산 후 잔액
         }
         window.Find("Pager/PageText").GetComponent<Text>().text = (historyPage + 1) + " <color=#ADA5C4>/ " + pages + "</color>";
         window.Find("Pager/PrevButton").GetComponent<Button>().interactable = message == null && historyPage > 0;
         window.Find("Pager/NextButton").GetComponent<Button>().interactable = message == null && historyPage < pages - 1;
+    }
+    // 서버가 검증한 스냅샷(길이3~5·값0~5)만 표시. null이면 과거 기록이라 숨김. 슬롯 Player0..4를 30 간격 가운데 정렬.
+    void ShowParticipants(Transform players, int[] images)
+    {
+        int count = images == null ? 0 : Mathf.Min(images.Length, players.childCount);
+        players.gameObject.SetActive(count > 0);
+        for (int i = 0; i < players.childCount; i++)
+        {
+            var slot = (RectTransform)players.GetChild(i);
+            slot.gameObject.SetActive(i < count);
+            if (i >= count) continue;
+            slot.GetComponent<Image>().sprite = matchmaking.Avatar(images[i]);
+            slot.anchoredPosition = new Vector2((i - (count - 1) / 2f) * 30f, slot.anchoredPosition.y);
+        }
     }
     void Quit()
     {

@@ -410,7 +410,7 @@ MonoBehaviour:
   OnClientAuthenticated:
     m_PersistentCalls:
       m_Calls: []
-  databaseConfigPath: 
+  databaseConfigPath: Database/config.json
 --- !u!1 &1974479711
 GameObject:
   m_ObjectHideFlags: 0

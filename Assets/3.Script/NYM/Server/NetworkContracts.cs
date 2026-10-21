@@ -6,7 +6,7 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 7; // 7: 시작 점수 64→50 (2026-10-20 사용자 결정)
+    public const int ProtocolVersion = 8; // 8: 전적 참가자 색상 participantProfileImages (PROFILE-01). 7: 시작 점수 64→50
     public const int RuleVersion = 2;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.
@@ -166,6 +166,7 @@ public struct GameRecordEntry
     public int rank;
     public long playedAtUtcTicks; // DB time(UTC 저장). 화면은 new DateTime(ticks, DateTimeKind.Utc)→KST 변환
     public int finalCoin;        // 정산 후 잔액
+    public int[] participantProfileImages; // 경기 참가자 색상(0~5, 길이=matchSize, [0]=본인·나머지 좌석 순, 이탈자 포함). null=스냅샷 없는 과거 기록
 }
 
 // ───────── 클라 → 서버 (Command 인자, 대기열은 NetworkMessage) ─────────
