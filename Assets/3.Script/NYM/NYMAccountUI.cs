@@ -248,7 +248,10 @@ public class NYMAccountUI : MonoBehaviour
     }
     void CloseForm(string popup)
     {
-        ClearPasswords(Panel(popup)); uiRoot.Find(popup).gameObject.SetActive(false);
+        ClearPasswords(Panel(popup));
+        // KPJ PopupView가 붙은 창은 닫힘 모션 후 꺼진다(2026-10-21 KPJ 요청·사용자 승인). 없으면 기존처럼 바로 끔
+        var view = uiRoot.Find(popup).GetComponent<PopupView>();
+        if (view != null) view.Close(); else uiRoot.Find(popup).gameObject.SetActive(false);
         if (LoggedIn && (popup == "ProfileEditPopup" || returnToInfo)) uiRoot.Find("MyInfoPopup").gameObject.SetActive(true);
         returnToInfo = false;
     }

@@ -203,6 +203,13 @@ public class GameSceneBuilder
         PopupView guideView = SetupGuidePopup(guidePopup);
         WireButtons(lexioCanvas, guideView);
         SetInitialStates(guidePopup);
+        // 프로필 수정 창의 닫기·취소에 NYM 씬에서 따라온 즉시 끄기 연결이 있으면 NYM 코드(닫힘 모션)보다 먼저 꺼 버리므로 지움
+        Transform profileEditPopup = uiCanvas.Find("ProfileEditPopup");
+        if (profileEditPopup != null)
+        {
+            RemoveListenersTo(profileEditPopup, profileEditPopup.gameObject);
+        }
+        FitChipTexts(lexioCanvas);
 
         Object.DestroyImmediate(oldManager);
         RemoveMissingScripts();
@@ -667,6 +674,175 @@ public class GameSceneBuilder
         }
     }
 
+    // ---------------- 칩 글자 칸 ----------------
+
+    // 칩 수(-123까지)가 칸 안에 들어가게 칸을 넓히고, 그보다 길면 글자가 줄어들게 함 (Best Fit)
+    //  - 인게임 이름표·내 정보: 카드 수 칸(두 자리면 충분)을 줄인 만큼 칩 칸을 넓힘. 줄 전체 폭은 그대로
+    //  - 결과창: 칩 칸을 왼쪽으로 넓히고 코인 아이콘을 그만큼 옮김
+    private void FitChipTexts(GameObject lexioCanvas)
+    {
+        Transform dynamicCanvas = lexioCanvas.transform.Find("GamePanel/DynamicCanvas");
+        if (dynamicCanvas != null)
+        {
+            for (int i = 0; i < dynamicCanvas.childCount; i++)
+            {
+                Transform label = dynamicCanvas.GetChild(i);
+                if (label.name == "MyInfo" || label.name.StartsWith("SeatLabel"))
+                {
+                    FitStatRow(label);
+                }
+            }
+        }
+        else
+        {
+            problems.Add("LexioCanvas/GamePanel/DynamicCanvas 없음 (이름표 칩 칸 조정 생략)");
+        }
+
+        Transform resultPanel = lexioCanvas.transform.Find("ResultPanel");
+        if (resultPanel != null)
+        {
+            for (int i = 0; i < resultPanel.childCount; i++)
+            {
+                Transform row = resultPanel.GetChild(i);
+                if (row.name.StartsWith("Row"))
+                {
+                    FitResultRow(row);
+                }
+            }
+        }
+        else
+        {
+            problems.Add("LexioCanvas/ResultPanel 없음 (결과창 칩 칸 조정 생략)");
+        }
+    }
+
+    private void FitStatRow(Transform label)
+    {
+        RectTransform coin = label.Find("Coin") as RectTransform;
+        RectTransform card = label.Find("Card") as RectTransform;
+        RectTransform coinText = null;
+        RectTransform cardText = null;
+        if (coin != null && card != null)
+        {
+            coinText = coin.Find("Coin_Text") as RectTransform;
+            cardText = card.Find("Card_Text") as RectTransform;
+        }
+
+        if (coinText != null && cardText != null)
+        {
+            Text chip = coinText.GetComponent<Text>();
+            Text tiles = cardText.GetComponent<Text>();
+            float extra = GetTextWidth(chip, "-123") - coinText.rect.width;
+            float spare = cardText.rect.width - GetTextWidth(tiles, "15");
+            float delta = Mathf.Min(extra, spare);
+            if (delta > 0f)
+            {
+                // 칩 칸은 왼쪽 끝을 두고 오른쪽으로, 카드 칸은 오른쪽 끝을 두고 왼쪽 끝을 줄임
+                GrowKeepLeft(coin, delta);
+                GrowKeepLeft(coinText, delta);
+                GrowKeepRight(card, -delta);
+                GrowKeepLeft(cardText, -delta);
+            }
+            if (extra > spare)
+            {
+                problems.Add(GetPath(label) + " 칩 칸이 " + Mathf.CeilToInt(extra - spare) + " 부족 (글자 자동 축소로 맞춤)");
+            }
+            EnableBestFit(chip);
+        }
+        else
+        {
+            problems.Add(GetPath(label) + " 의 Coin/Coin_Text·Card/Card_Text 없음 (칩 칸 조정 생략)");
+        }
+    }
+
+    private void FitResultRow(Transform row)
+    {
+        RectTransform chipText = row.Find("ChipText") as RectTransform;
+        RectTransform icon = row.Find("Coin_Icon") as RectTransform;
+        RectTransform changeText = row.Find("ChangeText") as RectTransform;
+        if (chipText != null && icon != null)
+        {
+            Text chip = chipText.GetComponent<Text>();
+            float extra = GetTextWidth(chip, "-123") - chipText.rect.width;
+            if (extra > 0f)
+            {
+                GrowKeepRight(chipText, extra);
+                icon.anchoredPosition = new Vector2(icon.anchoredPosition.x - extra, icon.anchoredPosition.y);
+            }
+            EnableBestFit(chip);
+            if (changeText != null)
+            {
+                EnableBestFit(changeText.GetComponent<Text>());
+                if (GetRight(changeText) > GetLeft(icon))
+                {
+                    problems.Add(GetPath(row) + " 증감 칸과 코인 아이콘이 겹침");
+                }
+            }
+        }
+        else
+        {
+            problems.Add(GetPath(row) + " 의 ChipText·Coin_Icon 없음 (칩 칸 조정 생략)");
+        }
+    }
+
+    // 이 글꼴·크기로 sample을 한 줄로 썼을 때의 너비 (캔버스 단위). 글꼴 정보를 못 얻으면 숫자 너비를 글자 크기의 0.6배로 어림
+    private float GetTextWidth(Text text, string sample)
+    {
+        float width = 0f;
+        if (text != null && text.font != null)
+        {
+            TextGenerationSettings settings = text.GetGenerationSettings(new Vector2(10000f, 10000f));
+            settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+            settings.scaleFactor = 1f;
+            settings.resizeTextForBestFit = false;
+            width = new TextGenerator().GetPreferredWidth(sample, settings);
+        }
+        if (width <= 0f && text != null)
+        {
+            width = text.fontSize * 0.6f * sample.Length;
+        }
+        // 글자 테두리(Outline 등)와 여유
+        return width + 6f;
+    }
+
+    // 칸보다 긴 숫자는 글자가 줄어들게 함 (원래 크기가 최대, 0.6배가 최소)
+    private void EnableBestFit(Text text)
+    {
+        if (text != null)
+        {
+            text.resizeTextForBestFit = true;
+            text.resizeTextMaxSize = text.fontSize;
+            text.resizeTextMinSize = Mathf.Max(1, Mathf.RoundToInt(text.fontSize * 0.6f));
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+        }
+    }
+
+    // 왼쪽 끝을 그대로 두고 너비를 delta만큼 바꿈 (가로 앵커가 한 점인 칸)
+    private void GrowKeepLeft(RectTransform target, float delta)
+    {
+        target.anchoredPosition = new Vector2(target.anchoredPosition.x + delta * target.pivot.x, target.anchoredPosition.y);
+        target.sizeDelta = new Vector2(target.sizeDelta.x + delta, target.sizeDelta.y);
+    }
+
+    // 오른쪽 끝을 그대로 두고 너비를 delta만큼 바꿈 (가로 앵커가 한 점인 칸)
+    private void GrowKeepRight(RectTransform target, float delta)
+    {
+        target.anchoredPosition = new Vector2(target.anchoredPosition.x - delta * (1f - target.pivot.x), target.anchoredPosition.y);
+        target.sizeDelta = new Vector2(target.sizeDelta.x + delta, target.sizeDelta.y);
+    }
+
+    // 같은 부모 안 칸의 좌우 끝 (가로 앵커가 한 점인 칸, 앵커 기준 위치)
+    private float GetLeft(RectTransform target)
+    {
+        return target.anchoredPosition.x - target.sizeDelta.x * target.pivot.x + target.anchorMin.x * ((RectTransform)target.parent).rect.width;
+    }
+
+    private float GetRight(RectTransform target)
+    {
+        return GetLeft(target) + target.sizeDelta.x;
+    }
+
     // 팝업을 여는 버튼 (NYM 코드가 입력칸 준비 등을 따로 붙이는 버튼도 여기서 연다)
     private void WireButtons(GameObject lexioCanvas, PopupView guideView)
     {
@@ -787,19 +963,31 @@ public class GameSceneBuilder
         EditorSceneManager.SaveScene(scene);
     }
 
-    // 빌드 목록 맨 앞에 GameClient(0)·GameServer(1). 나머지 팀원 씬 항목은 그대로 둠
+    // 빌드 목록에 GameClient·GameServer가 없을 때만 끝에 추가. 순서·켜짐은 팀이 정한 대로 둠
+    // (Lexio > Build Client/Server 메뉴는 빌드 목록과 상관없이 이 두 씬을 빌드함)
     private void UpdateBuildSettings()
     {
-        List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>();
-        scenes.Add(new EditorBuildSettingsScene(ClientScenePath, true));
-        scenes.Add(new EditorBuildSettingsScene(ServerScenePath, true));
-        EditorBuildSettingsScene[] current = EditorBuildSettings.scenes;
-        for (int i = 0; i < current.Length; i++)
+        List<EditorBuildSettingsScene> scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+        bool hasClient = false;
+        bool hasServer = false;
+        for (int i = 0; i < scenes.Count; i++)
         {
-            if (current[i].path != ClientScenePath && current[i].path != ServerScenePath)
+            if (scenes[i].path == ClientScenePath)
             {
-                scenes.Add(current[i]);
+                hasClient = true;
             }
+            if (scenes[i].path == ServerScenePath)
+            {
+                hasServer = true;
+            }
+        }
+        if (hasClient == false)
+        {
+            scenes.Add(new EditorBuildSettingsScene(ClientScenePath, true));
+        }
+        if (hasServer == false)
+        {
+            scenes.Add(new EditorBuildSettingsScene(ServerScenePath, true));
         }
         EditorBuildSettings.scenes = scenes.ToArray();
     }

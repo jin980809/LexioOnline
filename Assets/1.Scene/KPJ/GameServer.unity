@@ -391,6 +391,7 @@ MonoBehaviour:
   tablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
   maxMatches: 20
   matchTablePrefab: {fileID: 6168885847980892233, guid: 257544e3a5df23146b19ffe2baad495b, type: 3}
+  settlementJournalPath: 
   autoJoinMatchSize: 0
 --- !u!114 &298274124
 MonoBehaviour:
@@ -410,7 +411,7 @@ MonoBehaviour:
   OnClientAuthenticated:
     m_PersistentCalls:
       m_Calls: []
-  databaseConfigPath: 
+  databaseConfigPath: Database/config.json
 --- !u!1 &1974479711
 GameObject:
   m_ObjectHideFlags: 0
