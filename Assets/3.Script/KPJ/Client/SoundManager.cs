@@ -16,7 +16,8 @@ public class SoundManager : MonoBehaviour
         ChipGather,
         TimerWarning,
         Error,
-        OtherTurn
+        OtherTurn,
+        Select
     }
 
     private const string BgmVolumeKey = "Lexio.Sound.BgmVolume";
@@ -43,6 +44,8 @@ public class SoundManager : MonoBehaviour
     [SerializeField] private AudioClip receiveClip;
     // 칩을 모을 때 (라운드 정산)
     [SerializeField] private AudioClip chipGatherClip;
+    // 내 패 선택 효과음
+    [SerializeField] private AudioClip selectClip;
     // 남은 시간 경고
     [SerializeField] private AudioClip timerWarningClip;
     // 로그인이나 회원가입 시 실패 혹은 에러가 뜨면 재생
@@ -51,6 +54,7 @@ public class SoundManager : MonoBehaviour
     [SerializeField] private AudioClip otherTurnClip;
     // 내 차례 알림음. 효과음 크기를 따르고, 알림음 설정이 꺼져 있으면 재생하지 않음
     [SerializeField] private AudioClip turnAlertClip;
+
 
     [Header("Default (저장된 설정이 없을 때)")]
     [SerializeField, Range(0, MaxVolume)] private int defaultBgmVolume = 70;
@@ -223,6 +227,9 @@ public class SoundManager : MonoBehaviour
                 break;
             case Sfx.OtherTurn:
                 clip = otherTurnClip;
+                break;
+            case Sfx.Select:
+                clip = selectClip;
                 break;
         }
         return clip;
