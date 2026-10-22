@@ -111,3 +111,6 @@ InitTestScene*.unity*
 
 # Dedicated server private key
 /server-keys.json
+
+# Local server database credentials
+/Database/config.json

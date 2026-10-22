@@ -1,5 +1,39 @@
 # HANDOFF — Claude ↔ GPT 작업 현황과 인수인계
 
+## GPT AWS Protocol9 배포·외부 통합 검수 완료 — 2026-10-22 10:37 KST
+
+- 사용자 관리자 실행 DEPLOY_SUCCESS: Protocol9·PID6968·UTC2026-10-22T01:17:03.4061009Z, ZIP SHA A8904BA37FA249BEAEBC944F921448E987633FD57F2297987D9075E4655A46FC / 186파일 일치. 백업 C:\Lexio\Backups\Server-before-Protocol9-20261022-011651-729, 로그 C:\Lexio\Logs\server-20261022-011701-586.log. DB 설정/서버키/정산 저널 보존. 아래 10:12의 적용 대기는 당시 기록이며 현재 해소.
+- 외부 pinned9 가입 최종6/6·로그인6/6, 전적 필터0/3/4/5 각6명 성공(신규계정 빈 배열), 3인/4인/5인 시작(4/5/6스폰)·시작50차감·중단 전적/판수0 확인. 구8 로그인6/6 VersionMismatch. 음수 보유-100에서도 동시3인2경기 시작·모두-150 정상. 실제5라운드 전체 완주는 이번 재실행하지 않음.
+- 외부 최초 가입 1/6 ServiceUnavailable(재시도 성공), 동시3인2경기 중 한 경기 DB거절을 2회 재현. userinfo 인덱스0, 입장료 FOR UPDATE 전체스캔 ALL/13행, GEN_CLUST_INDEX X잠금 대기 최대3.964초(SQL 제한3초) 관측. 원본 DB192.168.1.48/test에 `ALTER TABLE userinfo ADD INDEX ix_userinfo_userID(userID), ALGORITHM=INPLACE, LOCK=NONE` 적용. 비고유·온라인·구조 비공개 백업·데이터 체크섬 동일. 조회 ref/1행으로 전환, 잠금13→0건. 인덱스 후 동시3인2경기 일반잔액/음수 각각 전원 성공, 가입도 새6계정6/6 성공. 서버 재빌드/재시작 없이 반영. 가입 최초 실패의 구체 예외는 미기록이므로 확정하지 않음.
+- 임시 계정6개와 소유 정산30행 정리 후 잔존0, 가입 재검수6개도 정리 후0. 실제 기존 계정/전적 값 변경0. 검수 helper 종료·Unity NYM_Client EditMode clean/네트워크 비활성·최종75개 소스 해시 빌드와 동일. SSH터널27936·AWS서버6968 유지. 터널 exe/인수/실제 TCP 연결 검증 및 로컬 관리용 PID 기록의 키·정확한 시작ticks 정규화, 기존 Start/Stop 스크립트의 실행중 인식 확인(터널 재시작0).
+- 새 서버/클라 빌드 각 오류0/경고3, C# 수정0. 최신 Release-Protocol9_20261022_0950 및 Deploy-Protocol9 유지. 구형 Release-Protocol9_20261021_1732만 삭제·새 ZIP 해시 유지·.private/설정/키/증적/AWS백업 보존. root manifest/EC2-instance/클라준비 문서 상태9 배포 완료로 갱신.
+- 후속 Claude: ServiceUnavailable 예외를 모두 숨기는 인증/입장료 경로에 비밀값 없는 MySQL 오류번호·단계·소요시간 진단 보완. SQL 제한3초·인증15초/UI20초 예산 검토. 무조건 재시도/격리수준 하향/정산 원장 우회 금지. 기존 AGENTS 분담에 따라 C#은 이번 미수정. 현재 인덱스 후 외부 재검수 실패0이며 장시간/실5라운드 완주 보장은 아님.
+- 근거: workspace tmp/lexio-release-20261022/aws-deployment-success.json, aws9-*.json, db-lock-observation-before/after-index.json, db-account-index.json, old-build-cleanup.json, verification.json. 현재PC·원본DB·SSH터널을 계속 켜 둬야 함.
+
+## GPT 전체 수정·연결 검수·Protocol9 재빌드 — 2026-10-22 10:12 KST
+
+- 사용자 전체 수정/연결 테스트/재빌드/AWS배포 승인. 이번에는 KPJ 원본 보존의 예외로 Inspector 수정 허용. 제품 C# 수정0·새 의존성0.
+- KPJ Client 및 GameClient LexioUI.profileSprites 6번째 avatar_6 연결. 생성기 원본 Client도 수정해 재조립 시 유지. 최신 GameClient를 기존 NYM_Client로 SaveAsCopy·GUID d9b5001068354c94688633752ca075d0 보존. 두 서버 씬 기존 상대경로 유지·Git 제외 Database/config.json 및 server-keys.json 외부 복구. Assets의 레거시 인증정보 미변경.
+- 두 KPJ/NYM 씬 참조/MissingScript0·단일 매니저·인증·Player/Table/격리·시작50/5라운드 확인. 보호된 DB 설정으로 SELECT1 정상, 기존 암호/계정/스키마 변경0.
+- DB 터널 기존 SSH 호스트키/계정/설정으로 재기동(PID27936). AWS8 첫 동시 조회 4/6 정상·2/6 ServiceUnavailable 후 재검수6/6 실제 로그인 성공. 기존 AWS8/새소스9 불일치는 관리자9 적용 후 외부 재검수 필요. 원격 실행5985/5986 닫힘·기존 SSH는 터널 전용. 현재 AWS 프로세스5280/Protocol8은 RDP 기존 배포 성공 출력 및 외부8 응답으로 확인.
+- 서버115.11초·클라74.02초 빌드 각각 오류0/경고3. NYM 서버/클라 각 씬 지정, 개발 빌드 아님. native 새9 서버/6임시계정 가입1000·로그인, 동시3인2경기(각4스폰),4인(5스폰),5인(6스폰), 시작마다50차감·중단시입장료유지·완료기록0·본인전적조회 성공. 실제 테스트씬 버튼→native9 로그인 profileImage5·avatar_6/인게임SetProfile5 일치·Console Error0. 클라 EXE266초 응답/예외0. 전체5라운드 네트워크 완주는 이번 재실행하지 않음.
+- 임시6계정 및 원장15행 삭제·잔존0, native 검수 프로세스만 경로/시작ticks 확인 종료. PlayerPrefs 저장ID/runInBackground 복원, NYM_Client EditMode clean·네트워크 비활성. QA 컴파일/출력 도구의 참조/문법/LitJson float 오류는 scratch에 한정, 제품 실행 오류0. 빌드 기준75파일 해시 동일.
+- 새 폴더 Release-Protocol9_20261022_0950: 서버ZIP40,130,883바이트/186파일 SHA A8904BA37FA249BEAEBC944F921448E987633FD57F2297987D9075E4655A46FC, 클라ZIP55,406,799바이트/187파일 SHA 7759752403CC1B8527837E9F8C1DADDD6F6BE875253DDF9FA33AE3619F6FA38A. SHA/CRC 전수검증·비밀파일0. Deploy-Protocol9.ps1/서버ZIP/README 3파일 및 PS5.1 ValidatePackageOnly 통과. 기존 Server 백업·DB/key ACL·외부 저널 제자리 보존·오류 복구 포함.
+- AWS9 아직 적용되지 않음. RDP 파일 복사 진행창 확인 후 원격 탐색기 응답 지연·완료 미확인. 사용자에게 3파일 복사 완료 확인 및 관리자 `& 'C:\Deploy-Protocol9\Deploy-Protocol9.ps1'` 실행 결과 필요. computer-use SKILL의 “Do not run Windows terminal commands via UI automation directly or indirectly.” 때문에 터미널 UI 실행은 사용자 단계. 배포 완료로 기록하지 않음. 외부9 로그인/전적/매칭은 적용 성공 후 진행.
+- 근거 workspace tmp/lexio-release-20261022/의 빌드/QA/DB/패키지 JSON 및 root manifest·EC2-instance 최신화. 진행 중 잠금 해제, 미완 운영 적용은 요청 표 유지.
+
+## GPT KPJ 두 씬 읽기 전용 검수 — 2026-10-22
+
+- 완료 2026-10-22 09:45 KST. 사용자 요청 범위: KPJ GameClient·GameServer 누락/서버·DB 연결 점검. 원본 씬·제품 C#·DB·설정·AWS 변경 없음. 재빌드/배포/서버 재시작 미실행.
+- **P1 로컬 서버 실행 설정 누락**: GameServer의 databaseConfigPath=Database/config.json, Encryption ServerLoadKeyPairFromFile=true·ServerKeypairPath=./server-keys.json. 현재 Unity CWD(프로젝트 루트)에 두 파일 없음. 명시 경로가 비어 있지 않아 Assets/Database fallback을 쓰지 않음. fallback 파일도 별도 SELECT1 시 MySQL1045. 보호된 정상 설정은 원본192.168.1.48:3306/test 접속 성공. 비밀번호/키를 Git·씬에 넣지 말고 서버 외부 설정으로 제공 필요. 클라 AWS 접속에는 비밀키 불필요.
+- **P1 AWS 연동**: 52.65.15.177:7777 pinned 암호화 연결 성공, Protocol9 로그인 VersionMismatch. 새 연결 Protocol8 로그인 ServiceUnavailable. 로컬 13306 SSH 역방향 터널 프로세스0 확인. 원본 DB 직접 접속 정상. 터널/EC2 DB 설정 확인과 현 소스9·운영8 동기화 필요. EC2 내부 포트/설정 직접 조회 없음 → 장애 원인 확정 아님.
+- **P2 클라 6번째 프로필 누락**: GameClient LexioCanvas/LexioUI.profileSprites=5, NYMMatchmakingUI.avatarSprites=6. 유효 profileImage=5가 인게임·결과에서 index0으로 대체됨. Inspector 6번째 Sprite 연결·원본/생성기 담당 협의 필요. 이번 수정0.
+- 정상: 두 씬 Missing Script/깨진 참조/빈 대상 활성 Button event0, 매니저 각1, Encryption→KCP7777·인증·매치 격리·Player/Table NetworkMatch 연결. 시작칩50/5라운드. 전적 SummaryText·5행·행별 참가자 슬롯5개 존재. UI 85검사 중 조건부 미사용 MainPage/SettingsButton만 제외.
+- DB 읽기 확인: userinfo 모드별 판수/1등·현재/최대코인·winRate, 3/4/5인 전적·참가자 색상, recordId/chipFormat·matchsettlement 존재. currentCoin 기본1000·signed. 데이터/스키마 쓰기0.
+- 상태 정정: 아래 옛 상단/요청 표의 Protocol7·DB-06/참가자 색상 미구현 표기는 과거 기록. 현재 소스 Protocol9/Rule2, 보호된 Protocol9 패키지 존재. 기존 패키지 소스75개 중 NYMAccountUI.cs·GameSceneBuilder.cs 2개가 현재와 달라 이후 변경 포함 여부는 재빌드 필요. 과거 HANDOFF 전체 복원/작업 상태 일괄 변경은 하지 않음.
+- 종료: 원래 NYM_Client clean·EditMode·Mirror 서버/클라 비활성·QA 오브젝트0. 제품 C#/대상 씬/프리팹/빌드 목록75개 해시 변경0. 첫 검수 스캐너의 SerializedProperty 문자열 조회 로그는 스캐너 수정 후 재검수; 제품 실행 결함으로 집계하지 않음.
+- 상세 근거: workspace tmp/lexio-kpj-scenes-20261022/검수결과.md·scenes.json·database.json·aws-login.json·aws8-login.json. 이번 요청은 검수이므로 누락은 보고 상태 유지.
+
 DB 인증정보 변경 안내 2026-10-21 10:59 KST: 사용자가 원본 DB 비밀번호 변경을 전달. workspace의 비공개 DBBridge/original-db-config.json 및 Protocol6QA/Database/config.json 갱신·동일값 재읽기 확인. 비밀번호는 이 문서/Git/로그에 기록하지 않는다. 다음 DB 재연결은 보호된 설정을 사용한다. Assets/Database/config.json은 Git 추적 파일이므로 새 비밀번호 기록 금지, Editor 서버 검수 시 Authenticator.databaseConfigPath에 보호된 로컬 연결 설정을 명시하고 호스트/포트 역할을 구분한다. EC2 실행 중 설정 교체/재기동·실DB 재연결 검수는 아직 수행하지 않음.
 
 테스트 클라 최신화 완료 2026-10-21 10:57 KST: 기존 NYM_Client_Scene(GUID d9b5001068354c94688633752ca075d0)에 KPJ GameClient 최신 화면/설정/게임 UI를 이식. NYM NetworkManager·Main Camera·Directional Light 보존, 나머지 관련 UI/View/배경 루트 갱신 및 cross-root 참조 재매핑. KPJ 원본 두 씬/제품 C# 보존. 매칭 시작/선택 카드6장·메인 종료 확인·게임/결과6색·오디오10개 연결, 전적5행에 참가자 슬롯5개씩 준비. 실제 참가자 색상 저장/응답/표시는 미구현으로 DB-20261021-08 Claude·DB 요청 등록. 첫 팝업 활성화 시 PopOutAnimator canvasGroup NRE3건 발견→초기 Window 비활성 씬 설정으로 보완, 10팝업 첫 열기/닫기 재검수 Error0/Warning0. 시작버튼/카드3·4·5 선택·종료 확인·설정창·전적 표시용 fixture 검수, 실제 DB/실경기 검수와 구분. 저장 후 재로드 Missing Script0·깨진참조0·매니저/EventSystem/AudioListener 각1·IP52.65.15.177 확인. 빌드 목록 NYM_Client0/NYM_Server1 활성 복원·나머지 비활성. 미저장 원본 복구본 저장/재열기10루트 검증, 검수 종료 EditMode clean·네트워크0·개인 설정 복원. 제품 코드/DB/계정/새 빌드/AWS 변경0, 후속 API 구현/검수/배포 대기. 근거 workspace tmp/lexio-client-refresh-20261021/verification.json 및 PNG.
@@ -263,13 +297,17 @@ UI 추가 검수 2026-10-20 11:52 KST: 실제 NYM Editor Play 입력/폼/6색/DB
 
 | ID | 요청자 → 담당 | 내용 | 대상 | 상태 |
 |---|---|---|---|---|
+| DB-QA-20261022-04 | GPT → Claude·DB 담당 | 가입/동시 매칭 초기 ServiceUnavailable 예외 단계·MySQL번호·소요시간을 비밀정보 없이 기록, 제한시간 예산 검토. userinfo 조회 인덱스로 동시 시작 잠금 재현 해소; 원자성/입력검증/원장 유지 | NYMAccountAuthenticator.cs·DB | 인덱스 적용·외부 재검수 실패0. 진단 C# 최소 보완 요청(이번 미수정), 첫 가입 예외 원인 미확정 |
+| KPJ-AUDIT-20261022-01 | GPT 검수 → 서버 설정 담당 | GameServer 로컬 DB 설정·키 경로 파일 없음; fallback DB1045. 보호된 설정/키를 서버 외부 경로로 공급 후 재검수. 클라 비밀키 불필요 | KPJ/GameServer·실행 환경 | 로컬 설정/키 복구·DB접속 검수 완료; 레거시 Assets 설정 미사용 |
+| KPJ-AUDIT-20261022-02 | GPT 검수 → 운영 담당 | AWS pin/UDP 정상·Protocol9 불일치·Protocol8 로그인 ServiceUnavailable. 원본 DB 정상·로컬13306 SSH 터널0. EC2/터널 확인 및 운영/소스 버전 동기화 | AWS·DB 터널 | AWS9 배포/PID6968·외부6가입/로그인·전적/3·4·5인/음수/동시2경기 통과; DB인덱스 보완 완료 |
+| KPJ-AUDIT-20261022-03 | GPT 검수 → 씬·생성기 담당 | GameClient LexioUI.profileSprites5개로 6번째 색이 인게임/결과에서0번으로 바뀜. 6번째 Sprite 누락 보완 필요 | KPJ/GameClient·GameSceneBuilder | KPJ 원본/생성원본/NYM 클라6색 연결·실UI 검수·재빌드 완료 |
 | KPJ-20261021-01 | KPJ(Claude) → NYM | 사용자 승인: NYMAccountUI.CloseForm이 창에 KPJ PopupView가 있으면 view.Close()(닫힘 모션), 없으면 기존 SetActive(false). GameClient/GameServer를 9b9e108 기준으로 재조립(GameServer databaseConfigPath=Database/config.json, settlementJournalPath 기본값). GameClient 칩 칸 -123 맞춤(이름표·내 정보·결과창, Best Fit). GameSceneBuilder는 빌드 목록 순서를 바꾸지 않음(GameClient/GameServer 없을 때만 추가). KPJ Client.unity Felt GUID 27de4411… 실제 반영 | NYM/NYMAccountUI.cs·KPJ/1.Scene·KPJ/Editor/GameSceneBuilder.cs | 배치 조립 경고0·컴파일0. 실행 검수 미실행 |
 | UI-20261021-01 | GPT → Claude·LSY / GPT 씬 검수 | PopupView.OnEnable→자식 PopOutAnimator.Open이 자식 Awake 전에 실행되어 canvasGroup null이 되는 초기화 순서 보완. Open/Close 진입 시 최소 안전 초기화, 기존 연출/인코딩 보존 | LSY/PopOutAnimator.cs·KPJ/Client/PopupView.cs | NYM 씬은 닫힌 팝업 Window 초기 비활성으로 보완하여 10개 첫 열기/닫기·재검수 오류0. 다른 원본 씬/동적 생성 경로를 위한 C# 보완은 담당자 요청. |
 | UI-20261021-02 | GPT → Claude·KPJ / GPT Inspector | SoundManager의 버튼/제출/패스/배분/정산/타이머/오류/턴 알림 호출 연결 여부 확인 및 필요한 최소 이벤트 연결. 중복 호출 방지·음량/음소거/차례알림 설정 유지 | KPJ 게임/UI 이벤트·SoundManager | NYM 오디오10클립/설정창 참조 연결 완료. 게임 이벤트 PlaySfx/PlayTurnAlert C# 연동 및 실제 경기별 재생 검수는 별도 대기. |
 
-| DB-20261021-08 | GPT → Claude·DB 담당 / GPT 씬 연결 | 실제 경기 참가자 프로필 색상 스냅샷 저장·조회 DTO·전적 중앙3/4/5 아이콘 | DB-04/06·GameRecordEntry·NYMAccountUI·NYM_Client_Scene | 10/21 11:04 Claude C# 반영(Protocol8): 시작 스냅샷·profileImages 열 감지 저장/조회·서버 검증·UI 표시. DB 담당 ALTER 적용·GPT Protocol8 재빌드·실경기 검수 대기. 작업 로그 11:04 참조. |
-| DB-20261020-07 | GPT → Claude·KPJ·DB 팀원 | 가입1000·3/4/5인 실제 시작당50차감·50미만 거절·원자 차감/복구·서버 권위·프로필 갱신. 완료 칩 정산(DB-04)/영속 중복키(DB-06)와 연계 | LexioNetworkManager·NYMAccountAuthenticator·NetworkContracts·NYMMatchmakingUI·DB 원장 계약 | 시작 차감/거절/프로필 C# 반영, GPT Protocol6/Rule2 후보 빌드·native/원본DB 검수 통과(17:36): 가입1000·대기/취소0·3/4/5 각50·49/50/51·중복 재신청0·동시2경기·DB부족/중복행 부분차감0·UI부족 안내. DB미연결 메서드 오류 경로 통과. 시작전 연결해제 보상·시작실패·서버 재시작 미검수. DB-04/06 미구현으로 전체 완료/운영 배포 보류. AWS5/1 유지. |
-| REL-20261020-01 | GPT → GPT | DB-06/QA-02→DB-04/05 통합 후 최신 규약 실경기/중복/실패/재시작 검수·NYM 명시 서버/클라 재빌드·패키지/키/DB 설정 검증·AWS 배포 | NYM 두 씬·패키지·AWS52.65.15.177 | 10/21 진행 점검 완료. 소스7/2·시작50, 보유 후보6/2·배포기록5/1. 시작50↔문서64 기준 및 KPJ 우선/NYM서버 비활성 빌드 목록 확인 필요. 최신7 빌드/실경기·오늘 AWS 실행/로그인 재검수 없음. DB-04/06·QA-02 조건 미충족으로 배포 보류 유지. |
+| DB-20261021-08 | GPT → Claude·DB 담당 / GPT 씬 연결 | 실제 경기 참가자 프로필 색상 스냅샷 저장·조회 DTO·전적 중앙3/4/5 아이콘 | DB-04/06·GameRecordEntry·NYMAccountUI·NYM_Client_Scene | 현재 Protocol9 참가자색상 스냅샷/전적 DTO/UI 구현·DB열 존재. 10/22 6색 Inspector·조회 필터 확인. 이번 새5라운드 완료 색상 저장/렌더 재검수 미실행 |
+| DB-20261020-07 | GPT → Claude·KPJ·DB 팀원 | 가입1000·3/4/5인 실제 시작당50차감·50미만 거절·원자 차감/복구·서버 권위·프로필 갱신. 완료 칩 정산(DB-04)/영속 중복키(DB-06)와 연계 | LexioNetworkManager·NYMAccountAuthenticator·NetworkContracts·NYMMatchmakingUI·DB 원장 계약 | 사용자 최종 규칙: 가입1000·음수/0도 매칭·시작50차감·완료남은칩 가산·시작후중단입장료유지. 10/22 새9 native/AWS3·4·5인/동시2경기·음수-100→-150 확인, 원장/잔액 일치 |
+| REL-20261020-01 | GPT → GPT | DB-06/QA-02→DB-04/05 통합 후 최신 규약 실경기/중복/실패/재시작 검수·NYM 명시 서버/클라 재빌드·패키지/키/DB 설정 검증·AWS 배포 | NYM 두 씬·패키지·AWS52.65.15.177 | 10/22 Protocol9 서버/클라 재빌드·AWS배포·외부6인/전적/3·4·5인/동시2경기/음수 통과. DB인덱스 후 재현0·소유임시데이터0. 이번 실5라운드 전체 완주 재실행 안 함 |
 | DB-20261020-03 | GPT → Claude·KTS | 새 userinfo15컬럼 계약에 NYM 계정 SQL/Register 기본값·PlayerProfile 및 KTS UserInfo/ServerDBManager 동기화. averageRank/구 등수 횟수 제거, 모드별 통계/코인/승률 추가. 기존 입력 검증·비밀번호 미전송 유지 | NYMAccountAuthenticator·NetworkContracts·kts/NewDB/UserInfo·ServerDBManager | NYM SQL/DTO 완료·Protocol5 동시 재빌드/Weaver0오류. GPT 원본DB 새 native 서버 가입/로그인/탈퇴·코인1000 응답 성공, 이전 Protocol4 직접 SQL18항목 CRUD/모드/코인 필드 읽기 검수와 구분. KTS 원본 UserInfo/ServerDBManager는 KTS 대기. AWS Protocol5 배포·외부 가입/로그인/탈퇴·코인1000 응답 및 원본DB 소유행 정리 검수 완료(15:25). |
 | DB-20261020-04 | GPT → Claude·KPJ·KTS | P1 정상5라운드 서버 결과·원래모드·유효참가자를 전적3표/userinfo/완료원장에 원자 저장, DB잔액+칩증감·통계·중복완료0·이탈/Aborted 제외 | LexioTable 완료경계·NYM 매니저/DB경계 | 10/21 코드 점검: Claude17:55 NYM 완료 저장·커밋 후 프로필 전송 코드 반영 확인, 현재Protocol7/Rule2. 실3/4/5인 완료·정산/재로그인 미검수. 실패 시 재시도 없음·마지막 라운드 확정~Finished 사이 전원 퇴장 시 누락 한계 유지. DB-06·QA-02 미완으로 출시 차단. |
 | DB-20261020-05 | GPT → Claude·GPT | 본인 전적·내 정보 모드/코인/승률 및 완료 저장 후 프로필/전적 갱신·저장중/오류/재시도 구분 | NYMAccountUI·NYMMatchmakingUI·NYMAccountAuthenticator.SendProfile·NetworkContracts | 기존5 조회/UI·6 입장료 검수 완료는 당시 실행본 기준. 10/21 최신 코드에 완료 커밋 뒤 SendProfile 확인. 완료 실DB/UI 검수·전적 자동 재조회·저장 실패/재시도 상태 미완, DB-04/06과 통합 검수 필요. |
@@ -340,6 +378,18 @@ UI 추가 검수 2026-10-20 11:52 KST: 실제 NYM Editor Play 입력/폼/6색/DB
 5. 현재 EC2/게임 서버 실행 유지. 사용자가 시험 종료할 때 종료·남은 비용 리소스 확인. Git commit/push 없음.
 
 ## 작업 로그
+
+### GPT 2026-10-22 10:37 KST — AWS9 배포·DB 조회 인덱스·외부 QA 완료
+
+- 상세 상단. 배포186파일/SHA·가입/로그인/전적/3·4·5인·음수·동시2경기 재검수 통과. DB 잠금은 비고유 userID 인덱스1개로 보완·데이터 동일. 임시행0·구형 로컬 패키지 삭제. C# 진단 후속 요청 DB-QA-20261022-04.
+
+### GPT 2026-10-22 10:12 KST — 전체 수정·Protocol9 빌드/검수 완료·AWS 관리자 적용 대기
+
+- 상세는 상단 최신 결과. 로컬 실행 설정/키·6색·테스트씬 최신화 완료. native9 가입/3/4/5/동시2매치·원본DB·실UI·PS5.1 ZIP 검증 통과. 임시데이터 잔존0. AWS 터널 복구/8로그인 성공, 새9 적용/외부9 검수는 아직 미완.
+
+### GPT 2026-10-22 09:45 KST — KPJ GameClient·GameServer 읽기 전용 검수
+
+- 상단 검수 결과 및 KPJ-AUDIT-20261022-01~03 참조. 로컬 DB/키 경로 누락·AWS8 ServiceUnavailable/소스9 불일치·6번째 인게임 프로필 누락 보고. 씬/C#/DB/설정/운영 변경0, 진행 중 해제.
 
 ### 2026-10-21 11:04 — Claude DB-20261021-08 전적 참가자 색상 C#
 - 스냅샷: `LexioNetworkManager.ChargeAndStart` 입장료 차감 커밋 시 DB에서 다시 읽은 profileImage를 시작 좌석 순으로 `matchAccounts[matchId]`에 보관(이탈자 포함·중복색 유지, 이후 프로필 변경/탈퇴 무관). `TrySaveMatch`→`NYMAccountAuthenticator.SaveMatch(…, participantImages, …)`로 전달.
