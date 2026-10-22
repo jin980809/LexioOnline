@@ -45763,10 +45763,12 @@ MonoBehaviour:
   passClip: {fileID: 8300000, guid: 4de958388d9a3224db174f5ac7f8ab86, type: 3}
   receiveClip: {fileID: 8300000, guid: cb92b734477da7448ac36b58f510056f, type: 3}
   chipGatherClip: {fileID: 8300000, guid: 47120427bf32466498308665415e42fc, type: 3}
+  selectClip: {fileID: 8300000, guid: ac3079f9097b83c4a94c53a3cb809675, type: 3}
   timerWarningClip: {fileID: 8300000, guid: a96ad7632d58d2247ab6132f97aba004, type: 3}
   errorClip: {fileID: 8300000, guid: 72451a17a7014ae4c9375b16b0114f5a, type: 3}
   otherTurnClip: {fileID: 8300000, guid: 87f30fd615e54754daf07557fcb53848, type: 3}
   turnAlertClip: {fileID: 8300000, guid: cecd6ce06ec0e8643a1a803a2d77215d, type: 3}
+  nextRoundClip: {fileID: 8300000, guid: dcee2099fb8316f4591c4e4fc4edf6f0, type: 3}
   defaultBgmVolume: 70
   defaultSfxVolume: 70
 --- !u!114 &1100011313

@@ -62,6 +62,8 @@ public class HandView : MonoBehaviour
     private int dragTargetSlot = -1;
 
     public event Action SelectionChanged;
+    // 내 패를 클릭해서 선택했을 때 (해제·끌어 옮기기·선택 초기화는 제외). 효과음용
+    public event Action TileSelected;
 
     // 손에 든 타일 (패 돌리기 연출이 받은 순서대로 날려 보낼 때 사용)
     public IReadOnlyList<TileView> Tiles
@@ -258,6 +260,10 @@ public class HandView : MonoBehaviour
                 {
                     pressedView.SetSelected(pressedView.IsSelected == false);
                     NotifySelectionChanged();
+                    if (pressedView.IsSelected && TileSelected != null)
+                    {
+                        TileSelected();
+                    }
                 }
                 pressedView = null;
             }
