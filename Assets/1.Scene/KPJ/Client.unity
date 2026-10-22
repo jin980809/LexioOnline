@@ -4432,16 +4432,16 @@ RectTransform:
   m_GameObject: {fileID: 639931880}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.8, y: 0.8, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 165842362}
   - {fileID: 1450130833}
   m_Father: {fileID: 1605199627}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 1, y: 0}
-  m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -108.9, y: 85}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -188, y: -79}
   m_SizeDelta: {x: 138.2, y: 145.6}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &639931882
@@ -5808,7 +5808,7 @@ RectTransform:
   m_GameObject: {fileID: 775142771}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.8, y: 0.8, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 632724669}
@@ -5816,7 +5816,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 165.7, y: -74.3}
+  m_AnchoredPosition: {x: 137.7, y: -64.3}
   m_SizeDelta: {x: 280, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &775142773
@@ -8370,7 +8370,7 @@ MonoBehaviour:
   opponentView: {fileID: 1136757348}
   centerPlayView: {fileID: 1136757347}
   dealAnimator: {fileID: 1136757346}
-  tileScale: 0.3
+  tileScale: 0.35
   tileGap: 0.06
   selectedLift: 0.35
   selectedTint: {r: 1, g: 0.95, b: 0.7, a: 1}
@@ -8428,8 +8428,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OpponentView
   tableView: {fileID: 1136757345}
   handView: {fileID: 1136757349}
-  opponentRadiusX: 5
-  opponentRadiusZ: 3.6
+  opponentRadiusX: 5.8
+  opponentRadiusZ: 4.1
   opponentOffsetZ: -1
   fivePlayerRadiusScale: 1.3
   opponentTileHeight: 0.55
@@ -8439,7 +8439,7 @@ MonoBehaviour:
   opponentRowRise: 0.4
   backTileEuler: {x: 0, y: 0, z: 0}
   labelHeight: 1.4
-  labelBackDistance: 3.8
+  labelBackDistance: 4.2
   chipFrontGap: 0.8
   revealDelaySeconds: 0.5
   revealSpacingRatio: 1.1
@@ -10435,7 +10435,7 @@ RectTransform:
   m_GameObject: {fileID: 1484198932}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.6, y: 0.6, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 535406182}
@@ -11372,7 +11372,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 242, y: 228.6}
+  m_AnchoredPosition: {x: 242, y: 160}
   m_SizeDelta: {x: 344.6, y: 167.8}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1600968748
