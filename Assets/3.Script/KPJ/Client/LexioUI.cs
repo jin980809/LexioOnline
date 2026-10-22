@@ -35,6 +35,8 @@ public class LexioUI : MonoBehaviour
     [Header("Connect")]
     // 게임 밖에서 보이는 화면. 통합 씬에서는 로그인~메인 화면 전체
     [SerializeField] private GameObject connectPanel;
+    // 경기에 들어오는 순간의 "게임 시작!" 화면. 보여 주는 동안은 게임 화면 대신 위 화면을 그대로 둠. 없으면 바로 넘어감
+    [SerializeField] private GameStartIntro gameStartIntro;
     // 아래 셋은 닉네임만으로 접속하는 테스트 씬용. 로그인으로 접속하는 씬에서는 비워 둠
     [SerializeField] private InputField nicknameInput;
     [SerializeField] private Button connectButton;
@@ -275,10 +277,12 @@ public class LexioUI : MonoBehaviour
             hasJoined = true;
         }
 
-        bool showConnect = isReady == false;
-        bool showLobby = isReady && table.Phase == GamePhase.Waiting;
-        bool showGame = isReady && table.Phase != GamePhase.Waiting;
-        bool showResult = isReady && table.Phase == GamePhase.Finished;
+        bool isIntroHolding = gameStartIntro != null && gameStartIntro.IsHoldingMenu;
+        bool isShowingTable = isReady && isIntroHolding == false;
+        bool showConnect = isShowingTable == false;
+        bool showLobby = isShowingTable && table.Phase == GamePhase.Waiting;
+        bool showGame = isShowingTable && table.Phase != GamePhase.Waiting;
+        bool showResult = isShowingTable && table.Phase == GamePhase.Finished;
 
         SetActive(connectPanel, showConnect);
         SetActive(lobbyPanel, showLobby);
@@ -302,7 +306,8 @@ public class LexioUI : MonoBehaviour
             isStartRequested = false;
         }
 
-        if (isReady)
+        // 시작 화면을 보여 주는 동안은 그리지 않고, 끝나면 처음부터 다시 그림
+        if (isShowingTable)
         {
             // 패 정리 시간은 시간이 지나서 끝나므로(동기화 변경 없음) 끝나는 순간 화면을 다시 그림
             bool isPreparing = table.IsPreparing;

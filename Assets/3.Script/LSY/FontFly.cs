@@ -11,13 +11,26 @@ public class FontFly : MonoBehaviour
     public float fadeTime = 1.5f;
 
     private CanvasGroup group;
+    private Vector3 startLocalPos;
+
+    private void Awake()
+    {
+        group = GetComponent<CanvasGroup>();
+        startLocalPos = transform.localPosition;
+    }
 
     private void OnEnable()
     {
-        group = GetComponent<CanvasGroup>();
+        transform.localPosition = startLocalPos;
         group.alpha = 1f;
         StartCoroutine(Fly());
     }
+
+    private void OnDisable()
+    {
+        StopAllCoroutines();
+    }
+
     public IEnumerator Fly()
     {
         yield return new WaitForSeconds(waitTime);

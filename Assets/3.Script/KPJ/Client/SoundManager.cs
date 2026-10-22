@@ -16,7 +16,8 @@ public class SoundManager : MonoBehaviour
         ChipGather,
         TimerWarning,
         Error,
-        OtherTurn
+        OtherTurn,
+        Select
     }
 
     private const string BgmVolumeKey = "Lexio.Sound.BgmVolume";
@@ -43,6 +44,8 @@ public class SoundManager : MonoBehaviour
     [SerializeField] private AudioClip receiveClip;
     // 칩을 모을 때 (라운드 정산)
     [SerializeField] private AudioClip chipGatherClip;
+    // 내 패 선택 효과음
+    [SerializeField] private AudioClip selectClip;
     // 남은 시간 경고
     [SerializeField] private AudioClip timerWarningClip;
     // 로그인이나 회원가입 시 실패 혹은 에러가 뜨면 재생
@@ -51,6 +54,9 @@ public class SoundManager : MonoBehaviour
     [SerializeField] private AudioClip otherTurnClip;
     // 내 차례 알림음. 효과음 크기를 따르고, 알림음 설정이 꺼져 있으면 재생하지 않음
     [SerializeField] private AudioClip turnAlertClip;
+    // !!!!!!!!!  정산하고 다음 라운드로 전환하는 연출을 위해 넣는 효과음
+    [SerializeField] private AudioClip nextRoundClip;
+
 
     [Header("Default (저장된 설정이 없을 때)")]
     [SerializeField, Range(0, MaxVolume)] private int defaultBgmVolume = 70;
@@ -156,6 +162,13 @@ public class SoundManager : MonoBehaviour
         }
     }
 
+    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //이쪽에 정산 이후 연출용 소리, 대신 칩 모을 때 소리가 겹칠 수도 있어서 세부 조정 필요
+    public void PlayNextRound()
+    {
+        PlayClip(nextRoundClip);
+    }
+
     // 효과음은 겹쳐서 재생 (같은 소리가 연달아 나도 앞 소리를 끊지 않음)
     public void PlayClip(AudioClip clip)
     {
@@ -223,6 +236,9 @@ public class SoundManager : MonoBehaviour
                 break;
             case Sfx.OtherTurn:
                 clip = otherTurnClip;
+                break;
+            case Sfx.Select:
+                clip = selectClip;
                 break;
         }
         return clip;

@@ -18,7 +18,7 @@ ModelImporter:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
       name: M_Felt
-    second: {fileID: 2100000, guid: 27de44114c62c3347add93a2c0e7720d, type: 2}
+    second: {fileID: 2100000, guid: 73afe9982a088874ea86d44ddde72f03, type: 2}
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule

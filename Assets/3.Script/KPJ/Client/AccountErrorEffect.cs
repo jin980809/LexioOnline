@@ -1,22 +1,24 @@
 using Mirror;
 using UnityEngine;
+using UnityEngine.UI;
 
-// 계정 요청이 실패하면 그 요청을 보낸 창에 실패 효과(kts의 ErrorAni: 창 흔들림 + 붉은 번쩍임)를 냄
-//  - 로그인 실패: 로그인 창
-//  - 아이디 중복 확인·회원가입 실패: 회원가입 창
-//  - 비밀번호 변경 실패: 비밀번호 변경 창
-// 서버 응답(NYMAccountAuthenticator의 결과 이벤트)만 보고 판단하므로, 서버에 보내기 전에 걸러지는 입력 오류에는 효과가 없음 (AccountSfxPlayer와 같은 기준)
-// 인증기가 없는 씬(UI 작업용 씬 등)에서는 아무것도 하지 않음
+// 계정 요청이 진행되지 않으면 그 창에 실패 효과(kts의 ErrorAni: 창 흔들림 + 붉은 번쩍임)를 냄
+//  - 로그인: 서버가 로그인을 거절했을 때 (NYMAccountAuthenticator의 로그인 결과)
+//  - 회원가입·비밀번호 변경·계정 삭제: 그 창에 실패 안내(빨간 글자)가 뜰 때 (NYMAccountUI의 ErrorFeedbackShown)
+//    입력 오류(비밀번호 불일치 등)와 서버 거절(중복 아이디 등) 모두. 안내 글자가 들어 있는 창의 효과를 냄
+// 인증기·계정 UI가 없는 씬(UI 작업용 씬 등)에서는 아무것도 하지 않음
 public class AccountErrorEffect : MonoBehaviour
 {
     [SerializeField] private ErrorAni loginEffect;
     [SerializeField] private ErrorAni signUpEffect;
     [SerializeField] private ErrorAni passwordChangeEffect;
+    [SerializeField] private ErrorAni accountDeleteEffect;
     // 각 효과가 흐리게 하는 번쩍임 (ErrorAni의 canvasGroup과 같은 것)
     // 번쩍임이 사라지는 중에 창이 닫히면 그 밝기로 멈춰 있다가 다음에 열 때 보이므로, 창이 꺼져 있으면 투명하게 되돌림
     [SerializeField] private CanvasGroup[] flashes;
 
     private NYMAccountAuthenticator authenticator;
+    private NYMAccountUI accountUi;
 
     private void Start()
     {
@@ -26,8 +28,13 @@ public class AccountErrorEffect : MonoBehaviour
         }
         if (authenticator != null)
         {
-            authenticator.ResultReceived += OnResultReceived;
-            authenticator.ActionResultReceived += OnActionResultReceived;
+            authenticator.ResultReceived += OnLoginResult;
+        }
+
+        accountUi = FindAnyObjectByType<NYMAccountUI>(FindObjectsInactive.Include);
+        if (accountUi != null)
+        {
+            accountUi.ErrorFeedbackShown += OnErrorFeedbackShown;
         }
     }
 
@@ -35,8 +42,11 @@ public class AccountErrorEffect : MonoBehaviour
     {
         if (authenticator != null)
         {
-            authenticator.ResultReceived -= OnResultReceived;
-            authenticator.ActionResultReceived -= OnActionResultReceived;
+            authenticator.ResultReceived -= OnLoginResult;
+        }
+        if (accountUi != null)
+        {
+            accountUi.ErrorFeedbackShown -= OnErrorFeedbackShown;
         }
     }
 
@@ -51,8 +61,7 @@ public class AccountErrorEffect : MonoBehaviour
         }
     }
 
-    // 로그인 결과
-    private void OnResultReceived(AccountResultMessage result)
+    private void OnLoginResult(AccountResultMessage result)
     {
         if (result.code != AccountResultCode.Success)
         {
@@ -60,20 +69,34 @@ public class AccountErrorEffect : MonoBehaviour
         }
     }
 
-    // 아이디 중복 확인·회원가입·비밀번호 변경 등 결과
-    private void OnActionResultReceived(AccountActionResult result)
+    // 안내 글자가 들어 있는 창의 효과를 냄
+    private void OnErrorFeedbackShown(Text label)
     {
-        if (result.code != AccountResultCode.Success)
+        if (label != null)
         {
-            if (result.operation == AccountOperation.CheckId || result.operation == AccountOperation.Register)
+            if (IsInside(label, signUpEffect))
             {
                 Play(signUpEffect);
             }
-            else if (result.operation == AccountOperation.ChangePassword)
+            else if (IsInside(label, passwordChangeEffect))
             {
                 Play(passwordChangeEffect);
             }
+            else if (IsInside(label, accountDeleteEffect))
+            {
+                Play(accountDeleteEffect);
+            }
         }
+    }
+
+    private bool IsInside(Text label, ErrorAni effect)
+    {
+        bool result = false;
+        if (effect != null)
+        {
+            result = label.transform.IsChildOf(effect.transform);
+        }
+        return result;
     }
 
     // 창이 꺼져 있으면 효과를 낼 수 없으므로(코루틴 시작 불가) 보이는 창에만 냄

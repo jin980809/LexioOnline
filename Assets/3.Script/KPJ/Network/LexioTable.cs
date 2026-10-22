@@ -14,6 +14,9 @@ public class LexioTable : NetworkBehaviour
     // 라운드 시작 패 돌리기 연출 시간. 클라이언트 DealAnimator.dealSeconds보다 조금 길게 (지연 여유)
     [SerializeField] private float dealSeconds = 2f;
 
+    // 게임이 시작되고 첫 라운드 패를 돌리기 전 대기. 클라이언트가 "게임 시작!" 화면(GameStartIntro)을 보여 주는 시간보다 조금 길게
+    [SerializeField] private float firstDealDelaySeconds = 1.5f;
+
     // 매 라운드 패를 받은 뒤 패를 보고 칸에 배치하는 시간. 이 동안은 아무도 낼 수 없음
     [SerializeField] private float prepareSeconds = 60f;
 
@@ -463,7 +466,16 @@ public class LexioTable : NetworkBehaviour
         game = new LexioGame(seats.Count, roundCount, startingChips, random);
         maxNumber = game.MaxNumber;
         phase = GamePhase.Playing;
-        StartRound();
+        // 첫 라운드도 라운드 사이 대기와 같은 방법으로 잠깐 미룸 (그동안 내기·패스 불가)
+        if (firstDealDelaySeconds > 0f)
+        {
+            isWaitingNextRound = true;
+            nextRoundTime = NetworkTime.time + firstDealDelaySeconds;
+        }
+        else
+        {
+            StartRound();
+        }
     }
 
     [Server]

@@ -5,7 +5,9 @@ using UnityEngine.UI;
 // 게임에서 일어나는 일에 맞춰 SoundManager의 효과음을 냄 (SoundManager와 같은 오브젝트에 붙임)
 //  - 버튼: 씬의 모든 버튼(꺼져 있는 것 포함)을 누를 때
 //  - 패 내기 / 패스: 누군가(나 포함) 냈거나 패스했다는 서버 알림을 받을 때
-//  - 패 받기: 새로 패를 나눠 받을 때 (같은 패를 다시 받는 경우는 제외)
+//  - 패 받기: 경기 첫 라운드 패를 나눠 받을 때 (같은 패를 다시 받는 경우는 제외)
+//  - 다음 라운드: 2라운드부터 새 라운드 패를 받을 때 (패 받기 소리 대신)
+//  - 패 선택: 내 패를 클릭해서 선택할 때 (해제할 때는 없음)
 //  - 칩 모으기: 라운드 정산 칩이 날아가기 시작할 때
 //  - 내 차례 / 다른 사람 차례: 차례가 바뀔 때 (패 정리 시간에는 없음). 내 차례 알림음은 설정창에서 끌 수 있음
 //  - 남은 시간 경고: 내 차례 남은 시간 경고가 켜질 때
@@ -18,6 +20,10 @@ public class GameSfxPlayer : MonoBehaviour
     private LexioTableNetworkManager networkManager;
     private LexioUI lexioUi;
     private ChipFlightView chipView;
+    private HandView handView;
+    // 다음 라운드 판정용: 이 테이블(경기)에서 새로 패를 받은 횟수
+    private LexioTable dealTable;
+    private int dealCount;
     // 차례 바뀜 판정용: 마지막으로 본 차례의 자리와 마감 시각 (같은 사람에게 다시 차례가 와도 마감 시각은 바뀜)
     private int lastTurnSeat = -1;
     private double lastTurnDeadline = -1;
@@ -50,6 +56,12 @@ public class GameSfxPlayer : MonoBehaviour
             chipView.SettleStarted += OnSettleStarted;
         }
 
+        handView = FindAnyObjectByType<HandView>(FindObjectsInactive.Include);
+        if (handView != null)
+        {
+            handView.TileSelected += OnTileSelected;
+        }
+
         Button[] buttons = FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < buttons.Length; i++)
         {
@@ -73,6 +85,10 @@ public class GameSfxPlayer : MonoBehaviour
         if (chipView != null)
         {
             chipView.SettleStarted -= OnSettleStarted;
+        }
+        if (handView != null)
+        {
+            handView.TileSelected -= OnTileSelected;
         }
     }
 
@@ -122,8 +138,33 @@ public class GameSfxPlayer : MonoBehaviour
     {
         if (isNewDeal)
         {
-            soundManager.PlaySfx(SoundManager.Sfx.Receive);
+            // 라운드 번호(동기화 값)는 손패보다 늦게 올 수 있어서, 이 경기에서 받은 횟수로 첫 라운드인지 판단
+            LexioTable table = null;
+            if (networkManager != null)
+            {
+                table = networkManager.Table;
+            }
+            if (table != dealTable)
+            {
+                dealTable = table;
+                dealCount = 0;
+            }
+            dealCount++;
+
+            if (dealCount > 1)
+            {
+                soundManager.PlayNextRound();
+            }
+            else
+            {
+                soundManager.PlaySfx(SoundManager.Sfx.Receive);
+            }
         }
+    }
+
+    private void OnTileSelected()
+    {
+        soundManager.PlaySfx(SoundManager.Sfx.Select);
     }
 
     private void OnSettleStarted()

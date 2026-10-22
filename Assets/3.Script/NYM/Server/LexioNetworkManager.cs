@@ -61,6 +61,7 @@ public class LexioNetworkManager : LexioTableNetworkManager
         public int[] images;      // 시작 좌석 순 색상 스냅샷(이탈자 포함)
         public int[] ranks, finalChips, seatIndexes;
         public long finishedAtUtcTicks;
+        public bool aborted;      // 경기 중 인원 부족으로 중단된 경기의 환불(Starting). 환불 뒤 남은 사람에게 잔액을 다시 보낸다
     }
 
     [Serializable]
@@ -410,6 +411,15 @@ public class LexioNetworkManager : LexioTableNetworkManager
         else settlements.Remove(key);
         SaveJournal();
 
+        // 중단된 경기 환불: 접속 중인 남은 사람에게 +입장료 반영한 잔액을 보낸다 (차감 때 보낸 잔액 기준)
+        if (outcome == SettlementOutcome.Applied && settlement.state == SettlementStarting && settlement.aborted)
+            foreach (NetworkConnectionToClient conn in NetworkServer.connections.Values)
+                if (conn.authenticationData is PlayerProfile profile && Array.IndexOf(settlement.userIds, profile.userId) >= 0)
+                {
+                    profile.currentCoin += LexioProtocol.EntryFee;
+                    accounts.SendProfile(conn, profile);
+                }
+
         if (profiles == null) return;
         foreach (NetworkConnectionToClient conn in NetworkServer.connections.Values)
         {
@@ -469,11 +479,27 @@ public class LexioNetworkManager : LexioTableNetworkManager
         }
     }
 
-    // 경기 중 남은 사람이 2명 이하 → Aborted: 입장료 유지, 완료 정산·판수·전적 없음. 남은 사람은 접속을 유지한 채 메인으로 돌아가 다시 매칭한다.
+    // 경기 중 남은 사람이 2명 이하 → Aborted: 남은 사람만 입장료 환불(나간 사람은 환불 없음), 완료 정산·판수·전적 없음 (2026-10-22 사용자 결정).
+    // 환불은 시작 못 한 경기의 환불과 같은 재시도 경로(Starting)로 처리. 남은 사람은 접속을 유지한 채 메인으로 돌아가 다시 매칭한다.
     void AbortMatch(Guid matchId)
     {
-        if (settlements.Remove(matchId.ToString("D"))) SaveJournal();
+        string key = matchId.ToString("D");
         List<NetworkConnectionToClient> seats = matches[matchId];
+        if (settlements.TryGetValue(key, out Settlement settlement))
+        {
+            var remaining = new List<string>();
+            foreach (NetworkConnectionToClient seatConn in seats)
+                if (seatConn != null && GetAccountKey(seatConn) != null) remaining.Add(GetAccountKey(seatConn));
+            if (remaining.Count > 0)
+            {
+                settlement.state = SettlementStarting;
+                settlement.userIds = remaining.ToArray();
+                settlement.aborted = true;
+                retries[key] = (0f, 0);
+            }
+            else settlements.Remove(key);
+            SaveJournal();
+        }
         for (int i = 0; i < seats.Count; i++)
         {
             NetworkConnectionToClient seatConn = seats[i];

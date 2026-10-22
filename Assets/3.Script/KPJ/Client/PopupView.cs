@@ -14,6 +14,12 @@ public class PopupView : MonoBehaviour
     // 루트가 켜진 다음 프레임에 창을 열어야 함 (OnEnable 참고)
     private bool isOpenPending;
 
+    // 닫힘 연출 중 (창이 다 들어가면 루트가 꺼지면서 끝남)
+    public bool IsClosing
+    {
+        get { return isClosing; }
+    }
+
     private void Awake()
     {
         if (closeButton != null)
@@ -77,7 +83,8 @@ public class PopupView : MonoBehaviour
     {
         if (gameObject.activeSelf)
         {
-            if (window != null && window.gameObject.activeSelf && isOpenPending == false)
+            // 창이 화면 계층에서 꺼져 있으면(부모가 꺼짐) 연출을 시작할 수 없으므로 바로 끔
+            if (window != null && window.gameObject.activeInHierarchy && isOpenPending == false)
             {
                 isClosing = true;
                 window.Close();
