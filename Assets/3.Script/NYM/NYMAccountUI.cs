@@ -92,7 +92,9 @@ public class NYMAccountUI : MonoBehaviour
         actionButtons = new[] { check, register, change, delete, edit };
 
         Get<Button>("MyInfoPopup/Window/AvatarEditButton").onClick.AddListener(OpenProfile);
-        Get<Button>("MyInfoPopup/Window/NicknameEditButton").onClick.AddListener(OpenProfile);
+        // 닉네임 옆 연필 버튼은 LSY가 지움(2026-10-22). 있는 씬에서만 연결하고, 없으면 건너뛴다 (프로필 수정은 AvatarEditButton)
+        var nicknameEdit = uiRoot.Find("MyInfoPopup/Window/NicknameEditButton");
+        if (nicknameEdit != null) nicknameEdit.GetComponent<Button>().onClick.AddListener(OpenProfile);
         Get<Button>("MyInfoPopup/Window/PasswordChangeButton").onClick.AddListener(() => PrepareForm("PasswordChangePopup", true));
         Get<Button>("MyInfoPopup/Window/AccountDeleteButton").onClick.AddListener(() => PrepareForm("AccountDeletePopup", true));
         Get<Button>("LoginPage/LoginPanel/PasswordChangeLink").onClick.AddListener(() => PrepareForm("PasswordChangePopup", false));
@@ -169,10 +171,13 @@ public class NYMAccountUI : MonoBehaviour
             colors[i].transform.Find("SelectCheck").gameObject.SetActive(i == selected);
         }
     }
+    // 실패 안내(빨간 글자)를 띄울 때. 입력 오류·서버 거절 모두 (KPJ AccountErrorEffect가 그 창에 실패 효과를 냄, 2026-10-22 KPJ 요청·사용자 승인)
+    public event Action<Text> ErrorFeedbackShown;
     void Feedback(Text label, string text, bool success = false)
     {
         label.text = text; label.color = success ? new Color32(47, 153, 61, 255) : new Color32(231, 76, 60, 255);
         label.gameObject.SetActive(!string.IsNullOrEmpty(text));
+        if (!success && !string.IsNullOrEmpty(text)) ErrorFeedbackShown?.Invoke(label);
     }
 
     void Update()
@@ -246,9 +251,22 @@ public class NYMAccountUI : MonoBehaviour
         input.readOnly = LoggedIn; deleteConfirm.isOn = false;
         Feedback(popup == "PasswordChangePopup" ? changeFeedback : deleteFeedback, "");
     }
+    // 닫을 때 안내 문구(빨간 글자 등)를 지워서 다시 열면 비어 있게 한다 (2026-10-22 KPJ 요청·사용자 승인)
+    void ClearFeedback(string popup)
+    {
+        if (popup == "SignUpPopup")
+        {
+            Feedback(signupFeedback, "");
+            Feedback(Get<Text>("SignUpPopup/Window/IdMessage"), "");
+        }
+        else if (popup == "PasswordChangePopup") Feedback(changeFeedback, "");
+        else if (popup == "AccountDeletePopup") Feedback(deleteFeedback, "");
+        else if (popup == "ProfileEditPopup") Feedback(editFeedback, "");
+    }
     void CloseForm(string popup)
     {
         ClearPasswords(Panel(popup));
+        ClearFeedback(popup);
         // KPJ PopupView가 붙은 창은 닫힘 모션 후 꺼진다(2026-10-21 KPJ 요청·사용자 승인). 없으면 기존처럼 바로 끔
         var view = uiRoot.Find(popup).GetComponent<PopupView>();
         if (view != null) view.Close(); else uiRoot.Find(popup).gameObject.SetActive(false);

@@ -212,10 +212,11 @@ public class NYMMatchmakingUI : MonoBehaviour
             choosing = false;
             if (matchSize != 0) ResetRequest();
         }
-        nicknameInput.gameObject.SetActive(!choosing && !inMatch);
-        connectButton.gameObject.SetActive(!choosing && !inMatch);
-        modePanel.SetActive(choosing && matchSize == 0 && !inMatch);
-        queuePanel.SetActive(matchSize != 0 && !inMatch);
+        // 인원 선택·대기 창이 떠 있어도 메인의 닉네임과 매치메이킹 버튼은 그대로 보인다 (2026-10-22 KPJ 요청·사용자 승인)
+        nicknameInput.gameObject.SetActive(!inMatch);
+        connectButton.gameObject.SetActive(!inMatch);
+        SetPanel(modePanel, choosing && matchSize == 0 && !inMatch, inMatch);
+        SetPanel(queuePanel, matchSize != 0 && !inMatch, inMatch);
         statusText.text = message.Length == 0 ? (accountAuthenticator == null ? "게스트 테스트 · v0.1.0" : "DB 계정 로그인 · v0.1.0") : message;
 
         bool popupOpen = guideDrawer != null && guideDrawer.IsOpen;
@@ -251,6 +252,19 @@ public class NYMMatchmakingUI : MonoBehaviour
             queueText.text = string.Format("{0}인 게임 · {1}", matchSize, queued ? "상대를 찾고 있어요" : "서버 연결 중");
             if (queueTimerText != null)
                 queueTimerText.text = string.Format("{0:00}:{1:00}", seconds / 60, seconds % 60);
+        }
+    }
+
+    // 경기에 들어가며 닫을 때는 KPJ PopupView 닫힘 모션으로 닫아, 그동안 "게임 시작!" 화면이 겹쳐 나타나게 한다 (2026-10-22 KPJ 요청·사용자 승인).
+    // 그 밖에는 기존처럼 바로 켜고 끈다. 닫히는 중에는 다시 부르지 않는다(매 프레임 다시 닫으면 모션이 처음부터 반복됨).
+    void SetPanel(GameObject panel, bool show, bool animateClose)
+    {
+        if (show) panel.SetActive(true);
+        else if (panel.activeSelf)
+        {
+            PopupView view = animateClose ? panel.GetComponent<PopupView>() : null;
+            if (view == null) panel.SetActive(false);
+            else if (!view.IsClosing) view.Close();
         }
     }
 
@@ -356,7 +370,7 @@ public class NYMMatchmakingUI : MonoBehaviour
     {
         if (result.requestId == 0 && result.reason == RejectReason.MatchEnded) // 서버 통보: 경기 중 인원 부족으로 중단
         {
-            message = "참가자가 2명 이하로 줄어 경기가 중단되었습니다. 입장료는 반환되지 않습니다.";
+            message = "참가자가 2명 이하로 줄어 경기가 중단되었습니다. 입장료는 반환됩니다."; // 안내 팝업은 KPJ MatchEndedNotice
             return;
         }
         if (matchSize == 0 || !joinSent) return;

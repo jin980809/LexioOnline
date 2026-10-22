@@ -68,7 +68,7 @@ public class GameSceneBuilder
         "MatchingPopup/Window/Slots/Slot0/Avatar", "MatchingPopup/Window/Slots/Slot0/NameText",
         "MyInfoPopup/Window/AccountDeleteButton", "MyInfoPopup/Window/AvatarEditButton", "MyInfoPopup/Window/BestChipStat/ValueText",
         "MyInfoPopup/Window/ChipBox/ChipText", "MyInfoPopup/Window/FirstPlaceStat/ValueText", "MyInfoPopup/Window/FirstRateStat/ValueText",
-        "MyInfoPopup/Window/NicknameEditButton", "MyInfoPopup/Window/PasswordChangeButton", "MyInfoPopup/Window/TotalGamesStat/ValueText",
+        "MyInfoPopup/Window/PasswordChangeButton", "MyInfoPopup/Window/TotalGamesStat/ValueText",
         "MyInfoPopup/Window/Row3P/Bar", "MyInfoPopup/Window/Row4P/Bar", "MyInfoPopup/Window/Row5P/Bar",
         "PasswordChangePopup/Window/CancelButton", "PasswordChangePopup/Window/ChangeButton", "PasswordChangePopup/Window/CloseButton",
         "PasswordChangePopup/Window/CurrentPasswordInput", "PasswordChangePopup/Window/Feedback", "PasswordChangePopup/Window/IdInput",
@@ -178,6 +178,10 @@ public class GameSceneBuilder
         sharedCanvas = CreateSharedCanvas(lexioCanvas);
         MoveToTarget(uiCanvas.Find("SettingsPopup2").gameObject, sharedCanvas);
         MoveToTarget(uiCanvas.Find("QuitConfirmPopup").gameObject, sharedCanvas);
+        // 경기 중 인원 부족으로 끝났을 때 안내 (게임 화면에서 메인으로 돌아오는 순간 뜸)
+        MoveToTarget(uiCanvas.Find("MatchEndedPopup").gameObject, sharedCanvas);
+        // 매칭이 잡혀 경기에 들어갈 때의 "게임 시작!" 화면 (메인 화면과 게임 화면 사이에 보여야 해서 맨 위 캔버스로)
+        MoveToTarget(uiCanvas.Find("GameStartIntro").gameObject, sharedCanvas);
         // 스크립트가 없는 예전 설정 창 배치 (SettingsPopup2로 대체됨)
         DestroyIfFound(uiCanvas, "SettingsPopup");
 
@@ -193,6 +197,8 @@ public class GameSceneBuilder
         SceneManager.MoveGameObjectToScene(guideManager, targetScene);
         GameObject guidePopup = FindRoot(guideScene, "UICanvas").transform.Find("GuidePopup").gameObject;
         MoveToTarget(guidePopup, uiCanvas);
+        // 메인 화면 설정 버튼은 맨 아래(가장 위에 그려짐). 위에서 옮겨 온 팝업들 뒤로 다시 보냄
+        uiCanvas.Find("SettingsButton").SetAsLastSibling();
 
         // 다른 씬을 가리키던 참조를 이 씬의 같은 오브젝트로 바꿈 (원본 씬을 닫기 전에 해야 경로를 읽을 수 있음)
         RemapSceneReferences();
@@ -424,6 +430,12 @@ public class GameSceneBuilder
         SerializedObject serializedObject = new SerializedObject(lexioUi);
         // 게임 밖에서는 로그인~메인 화면 전체를 보여 주고, 게임이 시작되면 끔
         serializedObject.FindProperty("connectPanel").objectReferenceValue = frontend;
+        serializedObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
+        // 패 돌리기 연출도 시작 화면이 끝난 뒤에 시작 (DealAnimator는 인게임 씬의 LexioTableView에 있음)
+        DealAnimator dealAnimator = FindRoot(targetScene, "LexioTableView").GetComponent<DealAnimator>();
+        SerializedObject dealObject = new SerializedObject(dealAnimator);
+        dealObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
+        dealObject.ApplyModifiedPropertiesWithoutUndo();
         serializedObject.FindProperty("nicknameInput").objectReferenceValue = uiCanvas.Find("MainPage/ProfileCard/GuestNicknameInput").GetComponent<InputField>();
         serializedObject.FindProperty("connectButton").objectReferenceValue = null;
         serializedObject.FindProperty("connectStatusText").objectReferenceValue = null;

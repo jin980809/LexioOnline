@@ -13,6 +13,8 @@ public class DealAnimator : MonoBehaviour
     // 서버 LexioTable.dealSeconds보다 짧아야 연출 중에 턴이 시작되지 않음
     [SerializeField] private float dealSeconds = 1.8f;
     [SerializeField] private float dealFlightSeconds = 0.35f;
+    // 경기 시작의 "게임 시작!" 화면. 보이는 동안(사라지는 중 포함)은 패 돌리기를 시작하지 않고 기다림. 없으면 바로 시작
+    [SerializeField] private GameStartIntro gameStartIntro;
     [SerializeField] private float dealArcHeight = 1.2f;
     [SerializeField] private Vector3 dealOrigin = new Vector3(0f, 0.6f, -0.5f);
 
@@ -100,6 +102,11 @@ public class DealAnimator : MonoBehaviour
 
     public void UpdateDeal()
     {
+        // 시작 화면이 끝날 때까지는 시작 시각을 계속 미뤄서, 끝난 순간부터 처음 장이 날아가게 함
+        if (gameStartIntro != null && gameStartIntro.IsPlaying)
+        {
+            dealStartTime = Time.time;
+        }
         float elapsed = Time.time - dealStartTime;
         float flightSeconds = Mathf.Max(0.01f, dealFlightSeconds);
         bool isAllLanded = true;
