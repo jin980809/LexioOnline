@@ -54,6 +54,8 @@ public class SoundManager : MonoBehaviour
     [SerializeField] private AudioClip otherTurnClip;
     // 내 차례 알림음. 효과음 크기를 따르고, 알림음 설정이 꺼져 있으면 재생하지 않음
     [SerializeField] private AudioClip turnAlertClip;
+    // !!!!!!!!!  정산하고 다음 라운드로 전환하는 연출을 위해 넣는 효과음
+    [SerializeField] private AudioClip nextRoundClip;
 
 
     [Header("Default (저장된 설정이 없을 때)")]
@@ -158,6 +160,13 @@ public class SoundManager : MonoBehaviour
         {
             PlayClip(turnAlertClip);
         }
+    }
+
+    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //이쪽에 정산 이후 연출용 소리, 대신 칩 모을 때 소리가 겹칠 수도 있어서 세부 조정 필요
+    public void PlayNextRound()
+    {
+        PlayClip(nextRoundClip);
     }
 
     // 효과음은 겹쳐서 재생 (같은 소리가 연달아 나도 앞 소리를 끊지 않음)
