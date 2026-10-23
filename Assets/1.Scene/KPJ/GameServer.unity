@@ -260,7 +260,7 @@ GameObject:
   - component: {fileID: 298274118}
   - component: {fileID: 298274123}
   - component: {fileID: 298274124}
-  - component: {fileID: 1820413252}
+  - component: {fileID: 298274125}
   m_Layer: 0
   m_Name: NetworkRoot
   m_TagString: Untagged
@@ -413,6 +413,18 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   databaseConfigPath: Database/config.json
+--- !u!114 &298274125
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 298274117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0bd5753f3f914a269e3d800b062e836, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ServerConsole
 --- !u!1 &1974479711
 GameObject:
   m_ObjectHideFlags: 0
@@ -557,15 +569,3 @@ SceneRoots:
   - {fileID: 1974479714}
   - {fileID: 47443441}
   - {fileID: 298274122}
---- !u!114 &1820413252
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 298274117}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e0bd5753f3f914a269e3d800b062e836, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: ::ServerConsole

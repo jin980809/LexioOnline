@@ -114,11 +114,18 @@ public class LexioUI : MonoBehaviour
     // 꺼져 있어도 피함 (준비 패널이 켜지고 꺼질 때 이름표가 들썩이지 않도록)
     [SerializeField] private RectTransform[] labelAvoidRects;
     // 이름표 위에 뜨는 말풍선 자리 (캔버스 단위). 겹침 판정 때 이름표 위로 이만큼 더 있다고 봄
+    // 이름표 안 말풍선(Bubble/Text)이 있으면 시작할 때 아래 두 문구를 실제 글꼴로 재서 대신 씀 (못 재면 이 값)
     [SerializeField] private float labelBubbleReserve = 100f;
-    // 말풍선 자리의 너비 (캔버스 단위). 말풍선은 글자 길이에 따라 너비가 바뀌므로 긴 문구("스트레이트 플러시 해 15") 기준으로 잡음
+    // 말풍선 자리의 너비 (캔버스 단위). 말풍선은 글자 길이에 따라 너비가 바뀌므로 긴 문구 기준으로 잡음
     [SerializeField] private float labelBubbleReserveWidth = 440f;
+    // 말풍선에 뜰 수 있는 가장 넓은 문구 (족보 이름 + 문양 + 숫자)
+    [SerializeField] private string widestBubbleText = "스트레이트 플러시 구름 15";
+    // 말풍선에 뜰 수 있는 가장 높은 문구 (정산 계산식 두 줄)
+    [SerializeField] private string tallestBubbleText = "13장 × 4 = 52점\n칩 -123";
     // 비켜 놓을 때 띄우는 간격 (캔버스 단위)
     [SerializeField] private float labelAvoidGap = 16f;
+    // 말풍선 자리(labelBubbleReserve)의 위쪽 끝이 화면 위에서 이만큼(캔버스 단위) 안쪽에 오도록, 넘치면 이름표를 내림 (4인 맞은편 자리 등)
+    [SerializeField] private float labelTopMargin = 60f;
 
     [Header("Profile")]
     // 인덱스 = 유저 DB의 imageNum (SeatInfo.profileImage). 범위를 넘으면 0번 사용
@@ -194,6 +201,9 @@ public class LexioUI : MonoBehaviour
     private Image[] seatLabelImages = new Image[0];
     private readonly Vector3[] avoidCorners = new Vector3[4];
     private float noticeHideTime;
+    // 이름표 위 말풍선 자리 (캔버스 단위). 시작할 때 실제 말풍선 글꼴로 잰 값, 못 재면 Inspector 값
+    private float bubbleReserveHeight;
+    private float bubbleReserveWidth;
 
     // 효과음용: 내 차례 남은 시간 경고가 켜질 때 / 알림 문구(낼 수 없는 패, 서버 알림)를 띄울 때
     public event System.Action TimerWarningStarted;
@@ -271,6 +281,7 @@ public class LexioUI : MonoBehaviour
         {
             seatLabelImages[i] = seatLabels[i].GetComponent<Image>();
         }
+        MeasureBubbleReserve();
     }
 
     private void Update()
@@ -927,10 +938,17 @@ public class LexioUI : MonoBehaviour
         float belowPivot = rect.height * scale.y * label.pivot.y;
         // 이름표 피벗에서 이름표 맨 위까지의 높이
         float labelAbovePivot = rect.height * (1f - label.pivot.y) * scale.y;
+        // 말풍선이 화면 위로 나가면 나가는 만큼 이름표를 내림
+        float topLimit = Screen.height - labelTopMargin * scale.y;
+        float reservedTop = y + labelAbovePivot + bubbleReserveHeight * scale.y;
+        if (reservedTop > topLimit)
+        {
+            y -= reservedTop - topLimit;
+        }
         float labelTop = y + labelAbovePivot;
         float labelBottom = y - belowPivot;
-        float bubbleTop = labelTop + labelBubbleReserve * scale.y;
-        float bubbleHalfWidth = labelBubbleReserveWidth * scale.x * 0.5f;
+        float bubbleTop = labelTop + bubbleReserveHeight * scale.y;
+        float bubbleHalfWidth = bubbleReserveWidth * scale.x * 0.5f;
         float gap = labelAvoidGap * scale.x;
         float resultX = x;
         if (labelAvoidRects != null)
@@ -979,6 +997,47 @@ public class LexioUI : MonoBehaviour
         }
         resultX = Mathf.Clamp(resultX, halfWidth, Screen.width - halfWidth);
         return new Vector3(resultX, y, 0f);
+    }
+
+    // 이름표 안 말풍선(Bubble/Text)의 글꼴·여백으로 가장 넓은 문구와 가장 높은 문구의 크기를 재서 말풍선 자리로 씀
+    // 높이 = 이름표 위 띄움 + 글자 높이 + 위아래 여백, 너비 = 글자 너비 + 좌우 여백
+    private void MeasureBubbleReserve()
+    {
+        bubbleReserveHeight = labelBubbleReserve;
+        bubbleReserveWidth = labelBubbleReserveWidth;
+        RectTransform bubble = null;
+        Text bubbleText = null;
+        if (seatLabels.Length > 0)
+        {
+            bubble = seatLabels[0].Find("Bubble") as RectTransform;
+        }
+        if (bubble != null)
+        {
+            bubbleText = bubble.GetComponentInChildren<Text>(true);
+        }
+        if (bubbleText != null && bubbleText.font != null)
+        {
+            TextGenerationSettings settings = bubbleText.GetGenerationSettings(new Vector2(10000f, 10000f));
+            settings.horizontalOverflow = HorizontalWrapMode.Overflow;
+            settings.verticalOverflow = VerticalWrapMode.Overflow;
+            settings.scaleFactor = 1f;
+            TextGenerator generator = new TextGenerator();
+            float textWidth = generator.GetPreferredWidth(widestBubbleText, settings);
+            float textHeight = generator.GetPreferredHeight(tallestBubbleText, settings);
+            float paddingX = 0f;
+            float paddingY = 0f;
+            HorizontalOrVerticalLayoutGroup layout = bubble.GetComponent<HorizontalOrVerticalLayoutGroup>();
+            if (layout != null)
+            {
+                paddingX = layout.padding.left + layout.padding.right;
+                paddingY = layout.padding.top + layout.padding.bottom;
+            }
+            if (textWidth > 0f && textHeight > 0f)
+            {
+                bubbleReserveWidth = textWidth + paddingX;
+                bubbleReserveHeight = bubble.anchoredPosition.y + textHeight + paddingY;
+            }
+        }
     }
 
     private void HideSeatLabels()

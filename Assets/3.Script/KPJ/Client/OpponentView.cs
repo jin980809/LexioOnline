@@ -6,6 +6,8 @@ using UnityEngine;
 // 상대 자리는 테이블 가운데 둘레의 타원 위에 놓고, 패 줄은 테이블 가운데를 바라보게 세움
 public class OpponentView : MonoBehaviour
 {
+    private const int FourPlayers = 4;
+
     [Header("References")]
     [SerializeField] private LexioTableView tableView;
     // 내 칩 자리를 손패 위치에서 계산
@@ -39,6 +41,10 @@ public class OpponentView : MonoBehaviour
     [SerializeField] private float sideLabelBackDistance = 3f;
     // 5인일 때 내 좌우(양끝) 상대 이름표를 화면에서 내리려고 낮추는 높이 (정옆일수록 많이)
     [SerializeField] private float fivePlayerSideLabelDrop = 1f;
+    // 4인일 때 좌우 상대 이름표를 낮추는 높이와 바깥쪽으로 더 미는 거리 (정옆일수록 많이)
+    // 맞은편 이름표가 차례 배너를 피해 옆으로 비키므로, 좌우 상대 말풍선이 그 이름표와 겹치지 않게 함
+    [SerializeField] private float fourPlayerSideLabelDrop = 1.8f;
+    [SerializeField] private float fourPlayerSideLabelOut = 1.7f;
 
     [Header("Chips (정산 칩이 출발/도착하는 자리)")]
     // 손패/상대 패 줄에서 테이블 가운데 쪽으로 떨어진 거리
@@ -285,6 +291,11 @@ public class OpponentView : MonoBehaviour
                 if (playerCount >= GameRules.MaxPlayers)
                 {
                     seatLabelHeight -= fivePlayerSideLabelDrop * sideness;
+                }
+                else if (playerCount == FourPlayers)
+                {
+                    seatLabelHeight -= fourPlayerSideLabelDrop * sideness;
+                    labelDistance += fourPlayerSideLabelOut * sideness;
                 }
                 seatAnchors[seat] = anchor - toCenter * labelDistance + Vector3.up * seatLabelHeight;
                 hasSeatAnchor[seat] = true;

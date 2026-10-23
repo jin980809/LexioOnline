@@ -60,6 +60,8 @@ public class NYMMatchmakingUI : MonoBehaviour
     [SerializeField] Button loginButton;
     [SerializeField] Button logoutButton;
     [SerializeField] Text accountText;
+    [Tooltip("체크하면 로그인·메인 화면 켜고 끄기를 다른 컴포넌트(KPJ FrontPageTransition, 전환 연출)가 맡음. 끄면 기존처럼 여기서 바로 전환 (2026-10-23 KPJ 요청·사용자 승인)")]
+    [SerializeField] bool externalPageSwitch;
 
     bool choosing;
     bool joinSent;
@@ -202,8 +204,11 @@ public class NYMMatchmakingUI : MonoBehaviour
         if (accountAuthenticator != null)
         {
             bool loggedIn = NetworkClient.isConnected && NetworkClient.connection != null && NetworkClient.connection.isAuthenticated;
-            loginPage.SetActive(!loggedIn);
-            mainPage.SetActive(loggedIn);
+            if (!externalPageSwitch)
+            {
+                loginPage.SetActive(!loggedIn);
+                mainPage.SetActive(loggedIn);
+            }
             loginButton.interactable = !NetworkClient.active;
         }
         bool inMatch = NetworkClient.isConnected && networkManager.Table != null && networkManager.LocalPlayer != null;
@@ -215,7 +220,8 @@ public class NYMMatchmakingUI : MonoBehaviour
         // 인원 선택·대기 창이 떠 있어도 메인의 닉네임과 매치메이킹 버튼은 그대로 보인다 (2026-10-22 KPJ 요청·사용자 승인)
         nicknameInput.gameObject.SetActive(!inMatch);
         connectButton.gameObject.SetActive(!inMatch);
-        SetPanel(modePanel, choosing && matchSize == 0 && !inMatch, inMatch);
+        // 닫기 버튼으로 선택을 취소할 때도 닫힘 모션(PopupView). 인원을 골라 매칭 중 창으로 바뀔 때만 바로 끔 (두 창이 겹쳐 보이지 않게)
+        SetPanel(modePanel, choosing && matchSize == 0 && !inMatch, inMatch || matchSize == 0);
         SetPanel(queuePanel, matchSize != 0 && !inMatch, inMatch);
         statusText.text = message.Length == 0 ? (accountAuthenticator == null ? "게스트 테스트 · v0.1.0" : "DB 계정 로그인 · v0.1.0") : message;
 
