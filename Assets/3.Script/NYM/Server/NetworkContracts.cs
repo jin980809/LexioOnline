@@ -6,7 +6,7 @@ using Mirror;
 
 public static class LexioProtocol
 {
-    public const int ProtocolVersion = 9; // 9: 전적 chipsKnown·최근20판·RejectReason.SettlementPending. 8: 전적 참가자 색상 participantProfileImages (PROFILE-01). 7: 시작 점수 64→50
+    public const int ProtocolVersion = 10; // 10: 서버 공지 ServerNoticeMessage. 9: 전적 chipsKnown·최근20판·RejectReason.SettlementPending. 8: 전적 참가자 색상 participantProfileImages (PROFILE-01). 7: 시작 점수 64→50
     public const int RuleVersion = 2;
 
     // 명세 확정값. 기획 옵션으로 열지 않는다.

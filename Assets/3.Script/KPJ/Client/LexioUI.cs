@@ -70,6 +70,9 @@ public class LexioUI : MonoBehaviour
     // 흔들리는 최대 각도(도)와 빠르기 (클수록 빠름)
     [SerializeField] private float timerShakeAngle = 8f;
     [SerializeField] private float timerShakeSpeed = 25f;
+    // 경고 중 맥박: 남은 초가 바뀔 때마다 이 배율로 커졌다가 timerPulseSeconds 동안 원래 크기로 돌아옴
+    [SerializeField] private float timerPulseScale = 1.35f;
+    [SerializeField] private float timerPulseSeconds = 0.45f;
     [SerializeField] private Text roundText;
     [SerializeField] private Text turnText;
     // 차례 글자 칸은 배너 이미지보다 넓으므로, 긴 닉네임은 배너 너비에서 양쪽 여백을 뺀 너비에 맞춤
@@ -181,6 +184,9 @@ public class LexioUI : MonoBehaviour
     private Sprite timerDefaultSprite;
     private Quaternion timerDefaultRotation = Quaternion.identity;
     private bool isTimerWarning;
+    private Vector3 timerDefaultScale = Vector3.one;
+    private int lastWarningSecond = -1;
+    private float timerPulseStartTime;
     // 타이머 슬라이더 비율 계산용: 지금 보고 있는 마감 시각과, 그 마감을 처음 본 순간의 남은 시간
     // 서버의 턴/정리 시간 길이는 동기화되지 않으므로 마감 시각이 바뀌는 순간의 남은 시간을 전체 길이로 씀
     private double timerEndTime = -1;
@@ -254,6 +260,7 @@ public class LexioUI : MonoBehaviour
         if (timerRoot != null)
         {
             timerDefaultRotation = timerRoot.localRotation;
+            timerDefaultScale = timerRoot.localScale;
         }
         if (myInfoPanel != null)
         {
@@ -619,7 +626,7 @@ public class LexioUI : MonoBehaviour
 
         bool isMyTurn = mySeat >= 0 && table.Phase == GamePhase.Playing && table.IsPreparing == false && table.CurrentSeat == mySeat;
         UpdateMyTurnHighlight(isMyTurn);
-        UpdateTimerWarning(isMyTurn && seconds >= 0 && seconds <= timerWarningSeconds);
+        UpdateTimerWarning(isMyTurn && seconds >= 0 && seconds <= timerWarningSeconds, seconds);
     }
 
     // 내 차례 동안 내 정보 배경을 myTurnColor와 원래 색 사이 반쯤까지 오가게 함. 아니면 원래 색
@@ -640,8 +647,8 @@ public class LexioUI : MonoBehaviour
         }
     }
 
-    // 남은 시간 경고: 켜지고 꺼질 때만 게이지 이미지를 바꾸고, 켜져 있는 동안 타이머 전체를 좌우로 흔듦 (숫자는 그대로)
-    private void UpdateTimerWarning(bool isWarning)
+    // 남은 시간 경고: 켜지고 꺼질 때만 게이지 이미지를 바꾸고, 켜져 있는 동안 타이머 전체를 좌우로 흔들며 초마다 맥박처럼 커졌다 작아짐 (숫자는 그대로)
+    private void UpdateTimerWarning(bool isWarning, int seconds)
     {
         if (isWarning != isTimerWarning)
         {
@@ -660,6 +667,8 @@ public class LexioUI : MonoBehaviour
             if (isWarning == false && timerRoot != null)
             {
                 timerRoot.localRotation = timerDefaultRotation;
+                timerRoot.localScale = timerDefaultScale;
+                lastWarningSecond = -1;
             }
             if (isWarning && TimerWarningStarted != null)
             {
@@ -671,6 +680,16 @@ public class LexioUI : MonoBehaviour
         {
             float angle = Mathf.Sin(Time.time * timerShakeSpeed) * timerShakeAngle;
             timerRoot.localRotation = timerDefaultRotation * Quaternion.Euler(0f, 0f, angle);
+
+            if (seconds != lastWarningSecond)
+            {
+                lastWarningSecond = seconds;
+                timerPulseStartTime = Time.time;
+            }
+            // 초가 바뀐 순간 가장 크고, 빠르게 줄어들며 원래 크기로
+            float remain = 1f - Mathf.Clamp01((Time.time - timerPulseStartTime) / Mathf.Max(0.01f, timerPulseSeconds));
+            float pulse = Mathf.Lerp(1f, timerPulseScale, remain * remain);
+            timerRoot.localScale = timerDefaultScale * pulse;
         }
     }
 

@@ -23,6 +23,8 @@ public class GameSceneBuilder
     private const string NymServerSourcePath = "Assets/1.Scene/NYM_Server_Scene.unity";
     private const string GuideSourcePath = "Assets/1.Scene/LSY/UI_work.unity";
     private const string PopupSettingsPath = "Assets/2.Model/Prefabs/PopupSettings.asset";
+    // 빌드한 클라이언트가 접속할 서버 (AWS EC2 공인 IP). NYM 씬 값과 상관없이 GameClient에 이 주소를 넣음
+    private const string ServerAddress = "13.125.241.244";
     private const string NymUiRootPath = "FrontendUI/UICanvas";
     // 매칭 인원 카드 이미지 (card_3p_default.png 등)
     private const string MatchCardFolder = "Assets/4.Sprite/LexioUI/match/";
@@ -144,6 +146,10 @@ public class GameSceneBuilder
         {
             manager.AddComponent<ServerAddressSelector>();
         }
+        SerializedObject addressObject = new SerializedObject(manager.GetComponent<ServerAddressSelector>());
+        addressObject.FindProperty("serverAddress").stringValue = ServerAddress;
+        addressObject.ApplyModifiedPropertiesWithoutUndo();
+        manager.GetComponent<Mirror.NetworkManager>().networkAddress = ServerAddress;
 
         // NYM 계정·매칭 UI (NYM 계정 UI가 이미 붙어 있으면 그대로 씀)
         GameObject accountSystem = FindAccountSystem(nymScene);
@@ -436,6 +442,23 @@ public class GameSceneBuilder
         SerializedObject dealObject = new SerializedObject(dealAnimator);
         dealObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
         dealObject.ApplyModifiedPropertiesWithoutUndo();
+        // 인게임 공지 띠는 메인 화면(UICanvas)의 공지 수신기와 시작 화면에 연결 (둘 다 다른 원본 씬에서 옴)
+        Transform noticeBanner = lexioCanvas.transform.Find("GamePanel/InGameNotice");
+        if (noticeBanner != null && noticeBanner.GetComponent<InGameNoticeBanner>() != null)
+        {
+            SerializedObject bannerObject = new SerializedObject(noticeBanner.GetComponent<InGameNoticeBanner>());
+            bannerObject.FindProperty("noticeReceiver").objectReferenceValue = uiCanvas.GetComponent<ServerNoticeReceiver>();
+            bannerObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
+            bannerObject.ApplyModifiedPropertiesWithoutUndo();
+            if (uiCanvas.GetComponent<ServerNoticeReceiver>() == null)
+            {
+                problems.Add("UICanvas 에 ServerNoticeReceiver 없음 (인게임 공지 띠가 공지를 못 받음)");
+            }
+        }
+        else
+        {
+            problems.Add("LexioCanvas/GamePanel/InGameNotice 의 InGameNoticeBanner 없음 (인게임 공지 생략)");
+        }
         serializedObject.FindProperty("nicknameInput").objectReferenceValue = uiCanvas.Find("MainPage/ProfileCard/GuestNicknameInput").GetComponent<InputField>();
         serializedObject.FindProperty("connectButton").objectReferenceValue = null;
         serializedObject.FindProperty("connectStatusText").objectReferenceValue = null;
@@ -965,6 +988,12 @@ public class GameSceneBuilder
             serializedObject.FindProperty("editorAutoStart").boolValue = true;
             serializedObject.FindProperty("startAsServer").boolValue = true;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+            // 서버 콘솔 명령 (notice 공지 등)
+            if (serverManager.GetComponent<ServerConsole>() == null)
+            {
+                serverManager.gameObject.AddComponent<ServerConsole>();
+            }
         }
         else
         {
