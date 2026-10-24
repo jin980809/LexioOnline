@@ -26,6 +26,8 @@ public class LexioTableView : MonoBehaviour
 
     private readonly Dictionary<Mesh, Material> outlineCache = new Dictionary<Mesh, Material>();
     private int cachedVersion = -1;
+    // 지금 화면에 패를 보여 주고 있는 테이블. 테이블이 없어지거나(메인으로 나감) 바뀌면 지난 게임의 패를 치움
+    private LexioTable shownTable;
     private bool isTileMeasured;
     private Vector3 tileSize;
     private Vector3 tileCenterOffset;
@@ -116,6 +118,7 @@ public class LexioTableView : MonoBehaviour
 
     private void Update()
     {
+        ClearIfTableChanged();
         if (dealAnimator.IsDealing)
         {
             dealAnimator.UpdateDeal();
@@ -177,6 +180,8 @@ public class LexioTableView : MonoBehaviour
 
     private void OnHandReceived(byte[] tileIds, bool isNewDeal, int mySeat, int playerCount)
     {
+        // 새 테이블 생성과 첫 손패가 같은 프레임에 오면, 먼저 지난 패를 치우고 새 패를 받음 (받은 뒤에 치워지지 않도록)
+        ClearIfTableChanged();
         if (isNewDeal)
         {
             // 새 라운드: 진행 중이던 연출과 지난 라운드 출발 위치를 정리
@@ -194,6 +199,21 @@ public class LexioTableView : MonoBehaviour
     private void OnHandsRevealed(byte[] tileIds, int[] counts)
     {
         opponentView.OnHandsRevealed(tileIds, counts);
+    }
+
+    // 결과 화면에서 메인으로 나가거나(테이블 없음) 다른 테이블로 바뀌면 지난 게임의 손패·가운데 패·공개된 남은 패를 치움
+    // 테이블이 없다가 새로 생긴 경우는 이미 치운 상태라 그대로 둠
+    private void ClearIfTableChanged()
+    {
+        LexioTable table = networkManager.Table;
+        if (table != shownTable)
+        {
+            if (shownTable != null)
+            {
+                ClearAll();
+            }
+            shownTable = table;
+        }
     }
 
     // 접속 종료: 오브젝트는 풀에 남겨두고 숨기기만 함

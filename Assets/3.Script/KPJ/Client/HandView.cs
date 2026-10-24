@@ -62,7 +62,7 @@ public class HandView : MonoBehaviour
     private int dragTargetSlot = -1;
 
     public event Action SelectionChanged;
-    // 내 패를 클릭해서 선택했을 때 (해제·끌어 옮기기·선택 초기화는 제외). 효과음용
+    // 내 패를 클릭해서 선택하거나 선택을 풀었을 때 (끌어 옮기기·선택 초기화 버튼은 제외). 효과음용
     public event Action TileSelected;
 
     // 손에 든 타일 (패 돌리기 연출이 받은 순서대로 날려 보낼 때 사용)
@@ -260,7 +260,7 @@ public class HandView : MonoBehaviour
                 {
                     pressedView.SetSelected(pressedView.IsSelected == false);
                     NotifySelectionChanged();
-                    if (pressedView.IsSelected && TileSelected != null)
+                    if (TileSelected != null)
                     {
                         TileSelected();
                     }

@@ -26,6 +26,9 @@ public class GameSceneBuilder
     private const string KtsClientSourcePath = "Assets/1.Scene/kts/kts_Client_Scene.unity";
     // 로고 애니메이션 범위를 재는 간격(초)
     private const float LogoSampleStep = 0.05f;
+    // 메인 프로필 카드 닉네임 글자 칸 (카드 기준 가로 위치·너비)
+    private const float CardNicknameCenterX = -32f;
+    private const float CardNicknameWidth = 210f;
     private const string PopupSettingsPath = "Assets/2.Model/Prefabs/PopupSettings.asset";
     // 빌드한 클라이언트가 접속할 서버 (AWS EC2 공인 IP). NYM 씬 값과 상관없이 GameClient에 이 주소를 넣음
     private const string ServerAddress = "13.125.241.244";
@@ -839,8 +842,6 @@ public class GameSceneBuilder
         account.FindProperty("rowSprite").objectReferenceValue = LoadSprite(HistoryRowFolder + "row_white.png");
         account.ApplyModifiedPropertiesWithoutUndo();
 
-        // 메인 프로필 카드의 닉네임은 NYM 닉네임 칸(GuestNicknameInput)이 보여 주므로 배치용 글자는 지움
-        DestroyIfFound(uiCanvas, "MainPage/ProfileCard/NicknameText");
 
         SerializedObject matchmaking = new SerializedObject(matchmakingUi);
         // 인원 카드는 선택만 하고 시작 버튼으로 매칭 신청
@@ -1060,13 +1061,64 @@ public class GameSceneBuilder
     // 닉네임 칸(GuestNicknameInput)은 NYM 씬에서 옮겨 온 것이라 여기서 맞춤
     private void EnlargeProfileCardTexts()
     {
-        SetCardText("MainPage/ProfileCard/GuestNicknameInput/Text", 36, 24);
-        SetCardText("MainPage/ProfileCard/GuestNicknameInput/Placeholder", 36, 24);
-        SetCardText("MainPage/ProfileCard/IdText", 26, 16);
-        SetCardText("MainPage/ProfileCard/ChipText", 40, 24);
+        SetupCardNickname();
+        SetCardText("MainPage/ProfileCard/IdText", 26, 16, HorizontalWrapMode.Wrap);
+        SetCardText("MainPage/ProfileCard/ChipText", 40, 24, HorizontalWrapMode.Wrap);
     }
 
-    private void SetCardText(string path, int size, int minSize)
+    // 프로필 카드 닉네임: NYM 매칭 UI가 쓰는 닉네임 입력칸(GuestNicknameInput)은 칸 너비만큼만 글자를 보여 줘서 8글자가 잘림
+    // 입력칸은 NYM 코드용으로 그대로 두고 보이지 않게 한 뒤, 일반 글자(NicknameText)가 입력칸 글자를 따라 보여 줌 (칸에 맞게 자동 축소)
+    // 너비는 아바타 오른쪽(-145)과 칩 아이콘 왼쪽(80) 사이에서 양쪽 8씩 띄운 -137 ~ 73
+    private void SetupCardNickname()
+    {
+        Transform input = uiCanvas.Find("MainPage/ProfileCard/GuestNicknameInput");
+        Transform label = uiCanvas.Find("MainPage/ProfileCard/NicknameText");
+        InputField field = null;
+        Text labelText = null;
+        if (input != null && label != null)
+        {
+            field = input.GetComponent<InputField>();
+            labelText = label.GetComponent<Text>();
+        }
+
+        if (field != null && labelText != null)
+        {
+            Image background = input.GetComponent<Image>();
+            if (background != null)
+            {
+                background.enabled = false;
+            }
+            HideText(field.textComponent);
+            HideText(field.placeholder as Text);
+
+            RectTransform labelRect = (RectTransform)label;
+            labelRect.sizeDelta = new Vector2(CardNicknameWidth, labelRect.sizeDelta.y);
+            labelRect.anchoredPosition = new Vector2(CardNicknameCenterX, labelRect.anchoredPosition.y);
+            label.gameObject.SetActive(true);
+            labelText.text = "";
+            SetCardText("MainPage/ProfileCard/NicknameText", 36, 20, HorizontalWrapMode.Wrap);
+
+            UnityEngine.Events.UnityAction<string> setText = (UnityEngine.Events.UnityAction<string>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<string>), labelText, "set_text");
+            UnityEventTools.AddPersistentListener(field.onValueChanged, setText);
+        }
+        else
+        {
+            problems.Add("프로필 카드 GuestNicknameInput 또는 NicknameText 없음 (닉네임 표시 조정 생략)");
+        }
+    }
+
+    // 입력칸 글자는 남겨 두되(입력칸이 글자 칸을 써야 함) 투명하게
+    private void HideText(Text text)
+    {
+        if (text != null)
+        {
+            Color color = text.color;
+            color.a = 0f;
+            text.color = color;
+        }
+    }
+
+    private void SetCardText(string path, int size, int minSize, HorizontalWrapMode horizontalOverflow)
     {
         Transform found = uiCanvas.Find(path);
         Text text = null;
@@ -1080,7 +1132,7 @@ public class GameSceneBuilder
             text.resizeTextForBestFit = true;
             text.resizeTextMaxSize = size;
             text.resizeTextMinSize = minSize;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.horizontalOverflow = horizontalOverflow;
             text.verticalOverflow = VerticalWrapMode.Truncate;
         }
         else
