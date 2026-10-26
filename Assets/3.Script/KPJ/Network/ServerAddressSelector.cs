@@ -9,7 +9,7 @@ public class ServerAddressSelector : MonoBehaviour
 {
     [Header("서버 주소")]
     [Tooltip("빌드한 클라이언트가 접속할 서버 주소 (AWS 공인 IP)")]
-    [SerializeField] private string serverAddress = "52.65.15.177";
+    [SerializeField] private string serverAddress = "13.125.241.244";
     [Tooltip("체크하면 에디터에서만 아래 로컬 주소로 접속 (빌드에는 영향 없음)")]
     [SerializeField] private bool useLocalInEditor;
     [Tooltip("에디터 로컬 테스트용 주소")]

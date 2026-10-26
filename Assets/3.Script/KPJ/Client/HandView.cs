@@ -62,7 +62,7 @@ public class HandView : MonoBehaviour
     private int dragTargetSlot = -1;
 
     public event Action SelectionChanged;
-    // 내 패를 클릭해서 선택했을 때 (해제·끌어 옮기기·선택 초기화는 제외). 효과음용
+    // 내 패를 클릭해서 선택하거나 선택을 풀었을 때 (끌어 옮기기·선택 초기화 버튼은 제외). 효과음용
     public event Action TileSelected;
 
     // 손에 든 타일 (패 돌리기 연출이 받은 순서대로 날려 보낼 때 사용)
@@ -118,7 +118,7 @@ public class HandView : MonoBehaviour
             {
                 handViews.Add(tableView.AcquireTile(handPool, receivedTiles[i], true));
             }
-            FillSlotsFromLeft();
+            FillSlotsCentered();
         }
         else
         {
@@ -180,7 +180,7 @@ public class HandView : MonoBehaviour
         {
             handViews.Sort(numberFirstComparison);
         }
-        FillSlotsFromLeft();
+        FillSlotsCentered();
         LayoutHand();
     }
 
@@ -260,7 +260,7 @@ public class HandView : MonoBehaviour
                 {
                     pressedView.SetSelected(pressedView.IsSelected == false);
                     NotifySelectionChanged();
-                    if (pressedView.IsSelected && TileSelected != null)
+                    if (TileSelected != null)
                     {
                         TileSelected();
                     }
@@ -331,13 +331,21 @@ public class HandView : MonoBehaviour
         return new Vector3(0f, rise, depth);
     }
 
-    // 정렬/새 라운드: handViews 순서대로 1번 칸부터 채움
-    private void FillSlotsFromLeft()
+    // 정렬/새 라운드: handViews 순서대로 앞줄 가운데에 모아 채움 (양쪽 빈칸 수를 맞춤, 홀수면 오른쪽이 한 칸 더 빔)
+    // 앞줄보다 많으면 앞줄을 다 채우고 나머지는 뒷줄 가운데부터
+    private void FillSlotsCentered()
     {
         Array.Clear(handSlots, 0, handSlots.Length);
-        for (int i = 0; i < handViews.Count && i < handSlots.Length; i++)
+        int index = 0;
+        for (int row = 0; row < handSlotRows && index < handViews.Count; row++)
         {
-            handSlots[i] = handViews[i];
+            int countInRow = Mathf.Min(handSlotColumns, handViews.Count - index);
+            int start = row * handSlotColumns + (handSlotColumns - countInRow) / 2;
+            for (int i = 0; i < countInRow; i++)
+            {
+                handSlots[start + i] = handViews[index];
+                index++;
+            }
         }
     }
 
@@ -544,7 +552,9 @@ public class HandView : MonoBehaviour
             Vector3 tileSize = tableView.TileSize;
             Quaternion rotation = Quaternion.Euler(handTileEuler);
             Vector3 centerOffset = rotation * tableView.TileCenterOffset;
-            Vector3 markerScale = new Vector3(tileSize.x * 1.12f, tileSize.y * 1.06f, 1f);
+            // 옆 칸 표시와 겹치면 반투명이 겹쳐 진하게 보이므로, 너비는 칸 간격보다 조금 좁게 제한함
+            float markerWidth = Mathf.Min(tileSize.x * 1.12f, GetSlotSpacing() - 0.01f);
+            Vector3 markerScale = new Vector3(markerWidth, tileSize.y * 1.06f, 1f);
             for (int slot = 0; slot < slotMarkers.Length; slot++)
             {
                 GameObject marker = slotMarkers[slot].gameObject;

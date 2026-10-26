@@ -22,7 +22,16 @@ public class GameSceneBuilder
     private const string NymClientSourcePath = "Assets/1.Scene/NYM_Client_Scene.unity";
     private const string NymServerSourcePath = "Assets/1.Scene/NYM_Server_Scene.unity";
     private const string GuideSourcePath = "Assets/1.Scene/LSY/UI_work.unity";
+    // 메인 화면 배경의 회전 테이블 (LexioTableTurnover)
+    private const string KtsClientSourcePath = "Assets/1.Scene/kts/kts_Client_Scene.unity";
+    // 로고 애니메이션 범위를 재는 간격(초)
+    private const float LogoSampleStep = 0.05f;
+    // 메인 프로필 카드 닉네임 글자 칸 (카드 기준 가로 위치·너비)
+    private const float CardNicknameCenterX = -32f;
+    private const float CardNicknameWidth = 210f;
     private const string PopupSettingsPath = "Assets/2.Model/Prefabs/PopupSettings.asset";
+    // 빌드한 클라이언트가 접속할 서버 (AWS EC2 공인 IP). NYM 씬 값과 상관없이 GameClient에 이 주소를 넣음
+    private const string ServerAddress = "13.125.241.244";
     private const string NymUiRootPath = "FrontendUI/UICanvas";
     // 매칭 인원 카드 이미지 (card_3p_default.png 등)
     private const string MatchCardFolder = "Assets/4.Sprite/LexioUI/match/";
@@ -86,6 +95,8 @@ public class GameSceneBuilder
     };
 
     private readonly List<string> problems = new List<string>();
+    // 로그인 로고를 UI로 옮길 때 이미지마다 원본 스프라이트의 정렬 순서
+    private readonly Dictionary<Transform, int> logoOrders = new Dictionary<Transform, int>();
     private Scene targetScene;
     private GameObject oldManager;
     private GameObject manager;
@@ -131,6 +142,7 @@ public class GameSceneBuilder
         Scene frontScene = EditorSceneManager.OpenScene(FrontSourcePath, OpenSceneMode.Additive);
         Scene nymScene = EditorSceneManager.OpenScene(NymClientSourcePath, OpenSceneMode.Additive);
         Scene guideScene = EditorSceneManager.OpenScene(GuideSourcePath, OpenSceneMode.Additive);
+        Scene ktsScene = EditorSceneManager.OpenScene(KtsClientSourcePath, OpenSceneMode.Additive);
 
         oldManager = FindRoot(targetScene, "NetworkManager");
         oldManager.name = "OldNetworkManager";
@@ -144,6 +156,10 @@ public class GameSceneBuilder
         {
             manager.AddComponent<ServerAddressSelector>();
         }
+        SerializedObject addressObject = new SerializedObject(manager.GetComponent<ServerAddressSelector>());
+        addressObject.FindProperty("serverAddress").stringValue = ServerAddress;
+        addressObject.ApplyModifiedPropertiesWithoutUndo();
+        manager.GetComponent<Mirror.NetworkManager>().networkAddress = ServerAddress;
 
         // NYM 계정·매칭 UI (NYM 계정 UI가 이미 붙어 있으면 그대로 씀)
         GameObject accountSystem = FindAccountSystem(nymScene);
@@ -200,6 +216,14 @@ public class GameSceneBuilder
         // 메인 화면 설정 버튼은 맨 아래(가장 위에 그려짐). 위에서 옮겨 온 팝업들 뒤로 다시 보냄
         uiCanvas.Find("SettingsButton").SetAsLastSibling();
 
+        // 로고: 로그인 화면은 LSY 애니메이션 로고(UI로 옮김), 메인 화면은 로고 없음
+        SetupLoginLogo(guideScene);
+        DestroyIfFound(uiCanvas, "MainPage/Logo");
+
+        // kts 회전 테이블 (메인 화면 배경, kts 씬과 같은 자리). 메인 화면과 함께 켜지고 꺼짐 (FrontPageTransition)
+        GameObject turnTable = FindRoot(ktsScene, "LexioTableTurnover");
+        PlaceLikeParent(turnTable, FindRoot(ktsScene, "FrontendUI").transform, frontend.transform);
+
         // 다른 씬을 가리키던 참조를 이 씬의 같은 오브젝트로 바꿈 (원본 씬을 닫기 전에 해야 경로를 읽을 수 있음)
         RemapSceneReferences();
 
@@ -209,6 +233,7 @@ public class GameSceneBuilder
         PopupView guideView = SetupGuidePopup(guidePopup);
         WireButtons(lexioCanvas, guideView);
         SetInitialStates(guidePopup);
+        SetupPageTransition(frontend, accountSystem.GetComponent<NYMMatchmakingUI>(), turnTable);
         // 프로필 수정 창의 닫기·취소에 NYM 씬에서 따라온 즉시 끄기 연결이 있으면 NYM 코드(닫힘 모션)보다 먼저 꺼 버리므로 지움
         Transform profileEditPopup = uiCanvas.Find("ProfileEditPopup");
         if (profileEditPopup != null)
@@ -216,6 +241,7 @@ public class GameSceneBuilder
             RemoveListenersTo(profileEditPopup, profileEditPopup.gameObject);
         }
         FitChipTexts(lexioCanvas);
+        EnlargeProfileCardTexts();
 
         Object.DestroyImmediate(oldManager);
         RemoveMissingScripts();
@@ -224,8 +250,336 @@ public class GameSceneBuilder
         EditorSceneManager.CloseScene(frontScene, true);
         EditorSceneManager.CloseScene(nymScene, true);
         EditorSceneManager.CloseScene(guideScene, true);
+        EditorSceneManager.CloseScene(ktsScene, true);
         EditorSceneManager.MarkSceneDirty(targetScene);
         EditorSceneManager.SaveScene(targetScene);
+    }
+
+    // LSY UI_work의 애니메이션 로고(Title, 3D 공간의 스프라이트)를 같은 구성의 UI 이미지로 바꿔 로그인 화면의 로고 자리(LoginPage/Logo)에 넣음
+    // 애니메이션은 로그인용 KPJ 복사본(LoginLogo, 조각 이름으로 연결). 애니메이션 전체에서 로고가 퍼지는 범위가 기존 로고 칸 안에 들어가게 크기를 맞춤
+    // 로그인 화면(LoginPage) 안에 있으므로 로그인 화면과 함께 켜지고 꺼짐. LSY 원본 씬은 읽기만 함
+    private void SetupLoginLogo(Scene guideScene)
+    {
+        GameObject title = FindRoot(guideScene, "Title");
+        RectTransform oldLogo = uiCanvas.Find("LoginPage/Logo") as RectTransform;
+        if (title != null && oldLogo != null)
+        {
+            GameObject logoObject = new GameObject("Logo", typeof(RectTransform));
+            logoObject.layer = oldLogo.gameObject.layer;
+            RectTransform logo = (RectTransform)logoObject.transform;
+            logo.SetParent(oldLogo.parent, false);
+            logo.anchorMin = oldLogo.anchorMin;
+            logo.anchorMax = oldLogo.anchorMax;
+            logo.pivot = oldLogo.pivot;
+            logo.sizeDelta = oldLogo.sizeDelta;
+            logo.anchoredPosition = oldLogo.anchoredPosition;
+            logo.SetSiblingIndex(oldLogo.GetSiblingIndex());
+            Object.DestroyImmediate(oldLogo.gameObject);
+
+            RectTransform uiTitle = CopySpritesAsUi(title.transform, logo);
+            SortLogoLayers(uiTitle);
+            FitLogo(uiTitle, logo);
+        }
+        else
+        {
+            problems.Add("UI_work의 Title 또는 LoginPage/Logo 없음 (로그인 로고 교체 생략)");
+        }
+    }
+
+    // 로그인 ↔ 메인 화면 전환 연출. NYM 매칭 UI는 화면을 직접 켜고 끄지 않고 FrontPageTransition에 맡김
+    private void SetupPageTransition(GameObject frontend, NYMMatchmakingUI matchmakingUi, GameObject turnTable)
+    {
+        FrontPageTransition transition = frontend.AddComponent<FrontPageTransition>();
+        SerializedObject transitionObject = new SerializedObject(transition);
+        transitionObject.FindProperty("loginPage").objectReferenceValue = uiCanvas.Find("LoginPage").gameObject;
+        transitionObject.FindProperty("mainPage").objectReferenceValue = uiCanvas.Find("MainPage").gameObject;
+        transitionObject.FindProperty("loginPanel").objectReferenceValue = FindUi(uiCanvas, "LoginPage/LoginPanel").transform;
+        transitionObject.FindProperty("logo").objectReferenceValue = FindUi(uiCanvas, "LoginPage/Logo").transform;
+        transitionObject.FindProperty("profileCard").objectReferenceValue = FindUi(uiCanvas, "MainPage/ProfileCard").transform;
+        transitionObject.FindProperty("menu").objectReferenceValue = FindUi(uiCanvas, "MainPage/Menu").transform;
+        transitionObject.FindProperty("noticeBar").objectReferenceValue = FindUi(uiCanvas, "MainPage/NoticeBar").transform;
+        // 배경 타일 묶음 (둥둥 모션 TileMouseMotion이 붙은 오브젝트). 로그인하면 양옆으로 치워지고 메인 화면에서는 꺼짐
+        TileMouseMotion tileMotion = frontend.GetComponentInChildren<TileMouseMotion>(true);
+        if (tileMotion != null)
+        {
+            transitionObject.FindProperty("backgroundTiles").objectReferenceValue = tileMotion.transform;
+        }
+        else
+        {
+            problems.Add("Frontend에 TileMouseMotion(배경 타일) 없음 (타일 치우기 생략)");
+        }
+        SerializedProperty propsProperty = transitionObject.FindProperty("mainProps");
+        propsProperty.arraySize = 0;
+        if (turnTable != null)
+        {
+            propsProperty.arraySize = 1;
+            propsProperty.GetArrayElementAtIndex(0).objectReferenceValue = turnTable.transform;
+            // 처음에는 로그인 화면이므로 꺼 둠
+            turnTable.SetActive(false);
+        }
+        transitionObject.ApplyModifiedPropertiesWithoutUndo();
+
+        SerializedObject matchmakingObject = new SerializedObject(matchmakingUi);
+        matchmakingObject.FindProperty("externalPageSwitch").boolValue = true;
+        matchmakingObject.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    // ---------------- 3D 스프라이트 로고를 UI로 ----------------
+
+    // source 아래 구조를 같은 이름·위치·회전·크기의 UI 오브젝트로 복사. 스프라이트는 Image로, Animator는 UI에서도 돌게 복사
+    // UI 칸 크기는 스프라이트 크기(유닛)라서, 부모 배율로 화면 크기를 정함 (애니메이션 값이 유닛 기준이라 그대로 맞음)
+    // 이미지마다 원본의 정렬 순서(Order in Layer)를 logoOrders에 적어 둠 (SortLogoLayers가 그리는 순서로 씀)
+    private RectTransform CopySpritesAsUi(Transform source, Transform parent)
+    {
+        RectTransform rect = CreateLogoRect(source.name, parent);
+        rect.gameObject.SetActive(source.gameObject.activeSelf);
+        rect.localPosition = source.localPosition;
+        rect.localRotation = source.localRotation;
+        rect.localScale = source.localScale;
+
+        SpriteRenderer spriteRenderer = source.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            // 자식이 있는 오브젝트의 스프라이트는 UI에서 항상 자식보다 먼저 그려지므로, 같은 자리의 자식 이미지로 따로 둬서 순서를 정할 수 있게 함
+            RectTransform imageRect = rect;
+            if (source.childCount > 0)
+            {
+                imageRect = CreateLogoRect(source.name + "Image", rect);
+            }
+            // 피벗을 바꿔도 위치(피벗 위치)는 그대로 둠
+            Vector3 position = imageRect.localPosition;
+            Sprite sprite = spriteRenderer.sprite;
+            imageRect.sizeDelta = sprite.rect.size / sprite.pixelsPerUnit;
+            imageRect.pivot = new Vector2(sprite.pivot.x / sprite.rect.width, sprite.pivot.y / sprite.rect.height);
+            imageRect.localPosition = position;
+            Image image = imageRect.gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.color = spriteRenderer.color;
+            image.raycastTarget = false;
+            image.enabled = spriteRenderer.enabled;
+            logoOrders[imageRect] = spriteRenderer.sortingOrder;
+        }
+
+        Animator animator = source.GetComponent<Animator>();
+        if (animator != null)
+        {
+            Animator uiAnimator = rect.gameObject.AddComponent<Animator>();
+            // 로그인 화면용으로 더 크게 튀는 KPJ 복사본(LoginLogo)을 씀. 만들 수 없으면 LSY 원본
+            RuntimeAnimatorController loginController = LoginLogoAnimationMaker.GetOrMake();
+            if (loginController != null)
+            {
+                uiAnimator.runtimeAnimatorController = loginController;
+            }
+            else
+            {
+                uiAnimator.runtimeAnimatorController = animator.runtimeAnimatorController;
+            }
+            uiAnimator.applyRootMotion = false;
+            uiAnimator.updateMode = animator.updateMode;
+            // UI에는 렌더러가 없어 화면 밖으로 판단해 멈추지 않게 항상 재생
+            uiAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        }
+
+        for (int i = 0; i < source.childCount; i++)
+        {
+            CopySpritesAsUi(source.GetChild(i), rect);
+        }
+        return rect;
+    }
+
+    private RectTransform CreateLogoRect(string name, Transform parent)
+    {
+        GameObject item = new GameObject(name, typeof(RectTransform));
+        item.layer = parent.gameObject.layer;
+        RectTransform rect = (RectTransform)item.transform;
+        rect.SetParent(parent, false);
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = Vector2.zero;
+        return rect;
+    }
+
+    // UI는 계층 순서대로 그려지므로 원본 정렬 순서를 형제 순서로 옮김
+    // Title 자체 스프라이트(완성 로고, 순서 1)는 애니메이션 조각(순서 0) 위, 코인 조각(순서 2) 아래여야 해서 애니메이션 묶음(Animator) 안으로 넣음
+    // 애니메이션은 조각 이름으로 연결되므로 묶음 안에 이미지를 더 넣어도 그대로 동작. 묶음이 Title과 같은 자리일 때만 옮김 (위치가 그대로이도록)
+    private void SortLogoLayers(RectTransform uiTitle)
+    {
+        Transform rootImage = uiTitle.Find(uiTitle.name + "Image");
+        Animator family = uiTitle.GetComponentInChildren<Animator>(true);
+        if (rootImage != null && family != null && family.transform.localPosition == Vector3.zero && family.transform.localRotation == Quaternion.identity && family.transform.localScale == Vector3.one)
+        {
+            rootImage.SetParent(family.transform, false);
+        }
+        SortByOrder(uiTitle);
+    }
+
+    // 정렬 순서가 낮은 것부터 앞(먼저 그림)에 오게 형제를 정렬하고, 이 묶음의 순서(자식 중 가장 낮은 값)를 돌려줌. 같은 순서는 원래 순서 유지
+    private int SortByOrder(Transform node)
+    {
+        int result = 0;
+        if (logoOrders.ContainsKey(node))
+        {
+            result = logoOrders[node];
+        }
+        if (node.childCount > 0)
+        {
+            List<Transform> children = new List<Transform>();
+            List<int> orders = new List<int>();
+            for (int i = 0; i < node.childCount; i++)
+            {
+                children.Add(node.GetChild(i));
+            }
+            for (int i = 0; i < children.Count; i++)
+            {
+                orders.Add(SortByOrder(children[i]));
+            }
+            for (int i = 1; i < children.Count; i++)
+            {
+                for (int j = i; j > 0 && orders[j - 1] > orders[j]; j--)
+                {
+                    int order = orders[j];
+                    orders[j] = orders[j - 1];
+                    orders[j - 1] = order;
+                    Transform child = children[j];
+                    children[j] = children[j - 1];
+                    children[j - 1] = child;
+                }
+            }
+            for (int i = 0; i < children.Count; i++)
+            {
+                children[i].SetSiblingIndex(i);
+            }
+            result = orders[0];
+        }
+        return result;
+    }
+
+    // 애니메이션 전체에서 로고 이미지들이 차지하는 가장 큰 범위가 logo 칸 안에 들어가게 uiTitle의 배율·위치를 맞춤 (가로세로 비율 유지)
+    private void FitLogo(RectTransform uiTitle, RectTransform logo)
+    {
+        Rect goal = logo.rect;
+        Rect current = GetAnimatedLogoRect(uiTitle, logo);
+        if (current.width > 0f && current.height > 0f)
+        {
+            // 원근이 없으므로 한 번 키우고 한 번 옮기면 맞음
+            float scale = Mathf.Min(goal.width / current.width, goal.height / current.height);
+            // 스프라이트 유닛(약 10)을 화면 칸(수백 px)에 맞추므로 보통 수십 배. 터무니없는 값이면 로고가 사라지지 않게 바꾸지 않음
+            if (scale > 0.1f && scale < 10000f)
+            {
+                uiTitle.localScale = new Vector3(uiTitle.localScale.x * scale, uiTitle.localScale.y * scale, 1f);
+                current = GetAnimatedLogoRect(uiTitle, logo);
+                Vector2 move = goal.center - current.center;
+                uiTitle.localPosition = new Vector3(uiTitle.localPosition.x + move.x, uiTitle.localPosition.y + move.y, 0f);
+            }
+            else
+            {
+                problems.Add("로그인 로고 크기 계산 이상 (배율 " + scale + ", 범위 " + current + ") — 크기·위치를 바꾸지 않음");
+            }
+        }
+        else
+        {
+            problems.Add("로그인 로고 이미지 범위를 못 구함 (크기 조정 생략)");
+        }
+    }
+
+    // logo 칸 기준 좌표에서, uiTitle 아래 애니메이션을 처음부터 끝까지 돌려 보며 이미지들이 차지한 가장 큰 범위
+    private Rect GetAnimatedLogoRect(RectTransform uiTitle, RectTransform logo)
+    {
+        Transform[] transforms = uiTitle.GetComponentsInChildren<Transform>(true);
+        Vector3[] positions = new Vector3[transforms.Length];
+        Quaternion[] rotations = new Quaternion[transforms.Length];
+        Vector3[] scales = new Vector3[transforms.Length];
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            positions[i] = transforms[i].localPosition;
+            rotations[i] = transforms[i].localRotation;
+            scales[i] = transforms[i].localScale;
+        }
+
+        Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+        Vector2 max = new Vector2(float.MinValue, float.MinValue);
+        AddImageRect(uiTitle, logo, ref min, ref max);
+        Animator[] animators = uiTitle.GetComponentsInChildren<Animator>(true);
+        for (int a = 0; a < animators.Length; a++)
+        {
+            if (animators[a].runtimeAnimatorController != null)
+            {
+                AnimationClip[] clips = animators[a].runtimeAnimatorController.animationClips;
+                for (int c = 0; c < clips.Length; c++)
+                {
+                    for (float time = 0f; time <= clips[c].length; time += LogoSampleStep)
+                    {
+                        clips[c].SampleAnimation(animators[a].gameObject, time);
+                        AddImageRect(uiTitle, logo, ref min, ref max);
+                    }
+                }
+            }
+        }
+
+        // 애니메이션을 돌려 보느라 바뀐 자세를 원래대로
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            transforms[i].localPosition = positions[i];
+            transforms[i].localRotation = rotations[i];
+            transforms[i].localScale = scales[i];
+        }
+
+        Rect result = Rect.zero;
+        if (max.x > min.x && max.y > min.y)
+        {
+            result = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+        return result;
+    }
+
+    // 켜진 이미지 네 모서리를 logo 칸 기준 좌표로 옮겨 범위에 더함
+    // 에디터에서 Overlay 캔버스는 배율 0으로 저장돼 있어 월드 좌표를 거치면 값이 깨지므로, logo까지의 부모 변환만 곱해서 계산함
+    // 크기가 0인 순간(애니메이션 시작 전)의 조각은 보이지 않으므로 뺌
+    private void AddImageRect(RectTransform uiTitle, RectTransform logo, ref Vector2 min, ref Vector2 max)
+    {
+        Vector3[] corners = new Vector3[4];
+        Image[] images = uiTitle.GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+        {
+            if (images[i].enabled && images[i].gameObject.activeInHierarchy)
+            {
+                Matrix4x4 toLogo = Matrix4x4.identity;
+                Transform current = images[i].transform;
+                while (current != null && current != logo)
+                {
+                    toLogo = Matrix4x4.TRS(current.localPosition, current.localRotation, current.localScale) * toLogo;
+                    current = current.parent;
+                }
+                images[i].rectTransform.GetLocalCorners(corners);
+                Vector3 right = toLogo.MultiplyPoint3x4(corners[2]) - toLogo.MultiplyPoint3x4(corners[1]);
+                Vector3 up = toLogo.MultiplyPoint3x4(corners[1]) - toLogo.MultiplyPoint3x4(corners[0]);
+                if (current == logo && right.sqrMagnitude > 0.000001f && up.sqrMagnitude > 0.000001f)
+                {
+                    for (int c = 0; c < 4; c++)
+                    {
+                        Vector3 local = toLogo.MultiplyPoint3x4(corners[c]);
+                        min = Vector2.Min(min, local);
+                        max = Vector2.Max(max, local);
+                    }
+                }
+            }
+        }
+    }
+
+    // 원본 씬에서 sourceParent 기준이던 위치·회전 그대로 newParent 아래에 둠 (크기는 원래 값 유지)
+    private void PlaceLikeParent(GameObject target, Transform sourceParent, Transform newParent)
+    {
+        if (target != null && sourceParent != null)
+        {
+            Quaternion inverse = Quaternion.Inverse(sourceParent.rotation);
+            Vector3 localPosition = inverse * (target.transform.position - sourceParent.position);
+            Quaternion localRotation = inverse * target.transform.rotation;
+            Vector3 localScale = target.transform.lossyScale;
+            MoveToTarget(target, newParent);
+            target.transform.localPosition = localPosition;
+            target.transform.localRotation = localRotation;
+            target.transform.localScale = localScale;
+        }
     }
 
     // NYM 계정·매칭 UI 오브젝트. 지금 NYM 씬은 AccountSystem 루트(매칭 UI + 계정 UI)
@@ -436,6 +790,23 @@ public class GameSceneBuilder
         SerializedObject dealObject = new SerializedObject(dealAnimator);
         dealObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
         dealObject.ApplyModifiedPropertiesWithoutUndo();
+        // 인게임 공지 띠는 메인 화면(UICanvas)의 공지 수신기와 시작 화면에 연결 (둘 다 다른 원본 씬에서 옴)
+        Transform noticeBanner = lexioCanvas.transform.Find("GamePanel/InGameNotice");
+        if (noticeBanner != null && noticeBanner.GetComponent<InGameNoticeBanner>() != null)
+        {
+            SerializedObject bannerObject = new SerializedObject(noticeBanner.GetComponent<InGameNoticeBanner>());
+            bannerObject.FindProperty("noticeReceiver").objectReferenceValue = uiCanvas.GetComponent<ServerNoticeReceiver>();
+            bannerObject.FindProperty("gameStartIntro").objectReferenceValue = sharedCanvas.Find("GameStartIntro").GetComponent<GameStartIntro>();
+            bannerObject.ApplyModifiedPropertiesWithoutUndo();
+            if (uiCanvas.GetComponent<ServerNoticeReceiver>() == null)
+            {
+                problems.Add("UICanvas 에 ServerNoticeReceiver 없음 (인게임 공지 띠가 공지를 못 받음)");
+            }
+        }
+        else
+        {
+            problems.Add("LexioCanvas/GamePanel/InGameNotice 의 InGameNoticeBanner 없음 (인게임 공지 생략)");
+        }
         serializedObject.FindProperty("nicknameInput").objectReferenceValue = uiCanvas.Find("MainPage/ProfileCard/GuestNicknameInput").GetComponent<InputField>();
         serializedObject.FindProperty("connectButton").objectReferenceValue = null;
         serializedObject.FindProperty("connectStatusText").objectReferenceValue = null;
@@ -471,8 +842,6 @@ public class GameSceneBuilder
         account.FindProperty("rowSprite").objectReferenceValue = LoadSprite(HistoryRowFolder + "row_white.png");
         account.ApplyModifiedPropertiesWithoutUndo();
 
-        // 메인 프로필 카드의 닉네임은 NYM 닉네임 칸(GuestNicknameInput)이 보여 주므로 배치용 글자는 지움
-        DestroyIfFound(uiCanvas, "MainPage/ProfileCard/NicknameText");
 
         SerializedObject matchmaking = new SerializedObject(matchmakingUi);
         // 인원 카드는 선택만 하고 시작 버튼으로 매칭 신청
@@ -683,6 +1052,92 @@ public class GameSceneBuilder
                     UnityEventTools.RemovePersistentListener(buttons[b].onClick, i);
                 }
             }
+        }
+    }
+
+    // ---------------- 메인 화면 프로필 카드 글자 ----------------
+
+    // 메인 화면 왼쪽 아래 프로필 카드의 닉네임·아이디·칩 글자를 키움 (칸보다 길면 최소 크기까지 줄어듦)
+    // 닉네임 칸(GuestNicknameInput)은 NYM 씬에서 옮겨 온 것이라 여기서 맞춤
+    private void EnlargeProfileCardTexts()
+    {
+        SetupCardNickname();
+        SetCardText("MainPage/ProfileCard/IdText", 26, 16, HorizontalWrapMode.Wrap);
+        SetCardText("MainPage/ProfileCard/ChipText", 40, 24, HorizontalWrapMode.Wrap);
+    }
+
+    // 프로필 카드 닉네임: NYM 매칭 UI가 쓰는 닉네임 입력칸(GuestNicknameInput)은 칸 너비만큼만 글자를 보여 줘서 8글자가 잘림
+    // 입력칸은 NYM 코드용으로 그대로 두고 보이지 않게 한 뒤, 일반 글자(NicknameText)가 입력칸 글자를 따라 보여 줌 (칸에 맞게 자동 축소)
+    // 너비는 아바타 오른쪽(-145)과 칩 아이콘 왼쪽(80) 사이에서 양쪽 8씩 띄운 -137 ~ 73
+    private void SetupCardNickname()
+    {
+        Transform input = uiCanvas.Find("MainPage/ProfileCard/GuestNicknameInput");
+        Transform label = uiCanvas.Find("MainPage/ProfileCard/NicknameText");
+        InputField field = null;
+        Text labelText = null;
+        if (input != null && label != null)
+        {
+            field = input.GetComponent<InputField>();
+            labelText = label.GetComponent<Text>();
+        }
+
+        if (field != null && labelText != null)
+        {
+            Image background = input.GetComponent<Image>();
+            if (background != null)
+            {
+                background.enabled = false;
+            }
+            HideText(field.textComponent);
+            HideText(field.placeholder as Text);
+
+            RectTransform labelRect = (RectTransform)label;
+            labelRect.sizeDelta = new Vector2(CardNicknameWidth, labelRect.sizeDelta.y);
+            labelRect.anchoredPosition = new Vector2(CardNicknameCenterX, labelRect.anchoredPosition.y);
+            label.gameObject.SetActive(true);
+            labelText.text = "";
+            SetCardText("MainPage/ProfileCard/NicknameText", 36, 20, HorizontalWrapMode.Wrap);
+
+            UnityEngine.Events.UnityAction<string> setText = (UnityEngine.Events.UnityAction<string>)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction<string>), labelText, "set_text");
+            UnityEventTools.AddPersistentListener(field.onValueChanged, setText);
+        }
+        else
+        {
+            problems.Add("프로필 카드 GuestNicknameInput 또는 NicknameText 없음 (닉네임 표시 조정 생략)");
+        }
+    }
+
+    // 입력칸 글자는 남겨 두되(입력칸이 글자 칸을 써야 함) 투명하게
+    private void HideText(Text text)
+    {
+        if (text != null)
+        {
+            Color color = text.color;
+            color.a = 0f;
+            text.color = color;
+        }
+    }
+
+    private void SetCardText(string path, int size, int minSize, HorizontalWrapMode horizontalOverflow)
+    {
+        Transform found = uiCanvas.Find(path);
+        Text text = null;
+        if (found != null)
+        {
+            text = found.GetComponent<Text>();
+        }
+        if (text != null)
+        {
+            text.fontSize = size;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMaxSize = size;
+            text.resizeTextMinSize = minSize;
+            text.horizontalOverflow = horizontalOverflow;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+        }
+        else
+        {
+            problems.Add("UICanvas/" + path + " 글자 없음 (프로필 카드 글자 크기 조정 생략)");
         }
     }
 
@@ -965,6 +1420,12 @@ public class GameSceneBuilder
             serializedObject.FindProperty("editorAutoStart").boolValue = true;
             serializedObject.FindProperty("startAsServer").boolValue = true;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+            // 서버 콘솔 명령 (notice 공지 등)
+            if (serverManager.GetComponent<ServerConsole>() == null)
+            {
+                serverManager.gameObject.AddComponent<ServerConsole>();
+            }
         }
         else
         {
